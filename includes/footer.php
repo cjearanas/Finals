@@ -180,7 +180,7 @@
   function fit() {
     document.querySelectorAll('.report-scroll[data-visible]').forEach(function (box) {
       var n = parseInt(box.dataset.visible, 10) || 4;
-      var rows = box.querySelectorAll('.report-row');
+      var rows = Array.prototype.filter.call(box.querySelectorAll('.report-row'), function (r) { return r.offsetParent !== null; });
       if (box.offsetParent === null) return;               // hidden tab, measured when shown
       if (rows.length <= n) { box.style.maxHeight = 'none'; return; }
       var h = 0;
@@ -188,6 +188,7 @@
       box.style.maxHeight = h + 'px';
     });
   }
+  window.fitReportLists = fit;
   window.addEventListener('load', fit);
   window.addEventListener('resize', fit);
   document.addEventListener('shown.bs.tab', fit);          // re-measure when a tab opens

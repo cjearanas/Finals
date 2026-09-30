@@ -10,6 +10,7 @@ $nav = [
     'dashboard' => ['href' => 'index.php',        'icon' => 'bi-house-door',          'label' => 'Dashboard'],
     'report'    => ['href' => 'report-issue.php',     'icon' => 'bi-exclamation-circle',  'label' => 'Report an Issue'],
     'log'       => ['href' => 'maintenance-log.php',  'icon' => 'bi-clipboard-check',     'label' => 'Maintenance Log'],
+    'account'   => ['href' => 'account.php',          'icon' => 'bi-person-circle',       'label' => 'Account'],
 ];
 ?>
 <!DOCTYPE html>
@@ -88,11 +89,16 @@ $nav = [
 
         <div class="dropdown">
           <a href="#" class="text-white text-decoration-none dropdown-toggle" data-bs-toggle="dropdown">
-            <i class="bi bi-person-circle fs-5 me-2 align-middle"></i>
+            <?php if ($currentUser['avatar']): ?>
+              <img src="<?= e(avatar_url($currentUser['avatar'])) ?>" alt="" class="rounded-circle me-2 align-middle"
+                   style="width:30px;height:30px;object-fit:cover">
+            <?php else: ?>
+              <i class="bi bi-person-circle fs-5 me-2 align-middle"></i>
+            <?php endif; ?>
             <?= e($currentUser['name']) ?>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" href="#">Account</a></li>
+            <li><a class="dropdown-item" href="account.php">Account</a></li>
             <li><a class="dropdown-item" href="#">Log out</a></li>
           </ul>
         </div>

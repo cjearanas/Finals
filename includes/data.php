@@ -266,5 +266,88 @@ function csrf_valid(?string $token): bool
     return is_string($token) && hash_equals($_SESSION['csrf'] ?? '', $token);
 }
 
-// Placeholder for the logged-in user (replace with your auth system later)
-$currentUser = ['name' => 'Lastname, Firstname, MI', 'greeting' => 'User'];
+// ---------------------------------------------------------------------------
+// Logged-in user (demo data kept in the session; replace with your auth/database).
+// Demo password: password123
+// ---------------------------------------------------------------------------
+if (!isset($_SESSION['user'])) {
+    $_SESSION['user'] = [
+        'last_name'     => 'Lastname',
+        'first_name'    => 'Firstname',
+        'mi'            => 'M',
+        'email'         => 'firstname.lastname@pcu-d.edu.ph',
+        'school_id'     => '2022-00123',
+        'department'    => 'Computer Science',
+        'contact'       => '09XX-XXX-XXXX',
+        'role'          => 'Student',
+        'avatar'        => null,
+        'password_hash' => password_hash('password123', PASSWORD_DEFAULT),
+    ];
+}
+
+$__u = $_SESSION['user'];
+$currentUser = [
+    'name'     => $__u['last_name'] . ', ' . $__u['first_name'] . ($__u['mi'] !== '' ? ' ' . $__u['mi'] . '.' : ''),
+    'greeting' => $__u['first_name'],
+    'initials' => strtoupper(mb_substr($__u['first_name'], 0, 1) . mb_substr($__u['last_name'], 0, 1)),
+    'avatar'   => $__u['avatar'],
+];
+unset($__u);
+
+/** Public URL of a profile picture */
+function avatar_url(?string $file): string
+{
+    return 'uploads/' . rawurlencode((string)$file);
+}
+
+/** One-time messages shown after a redirect */
+function flash_set(string $type, string $msg): void
+{
+    $_SESSION['flash'] = ['type' => $type, 'msg' => $msg];
+}
+
+function flash_get(): ?array
+{
+    $f = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
+    return $f;
+}
+
+const AVATAR_MAX  = 5 * 1024 * 1024;
+const AVATAR_MIME = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+
+/** Validate + save a profile picture (images only, max 5MB). Returns file name or null. */
+function save_avatar(array $f, array &$errors): ?string
+{
+    $err = $f['error'] ?? UPLOAD_ERR_NO_FILE;
+    if ($err === UPLOAD_ERR_NO_FILE) {
+        $errors[] = 'Please choose a picture.';
+        return null;
+    }
+    if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE || $f['size'] > AVATAR_MAX) {
+        $errors[] = 'The picture is larger than 5MB.';
+        return null;
+    }
+    if ($err !== UPLOAD_ERR_OK) {
+        $errors[] = 'The picture failed to upload.';
+        return null;
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    if (!isset(AVATAR_MIME[$mime])) {
+        $errors[] = 'Only JPG, PNG, WebP or GIF pictures are allowed.';
+        return null;
+    }
+    $dir = __DIR__ . '/../uploads';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+    $name = 'avatar_' . bin2hex(random_bytes(10)) . '.' . AVATAR_MIME[$mime];
+    return move_uploaded_file($f['tmp_name'], $dir . '/' . $name) ? $name : null;
+}
+
+function delete_avatar_file(?string $file): void
+{
+    if ($file && ($path = __DIR__ . '/../uploads/' . basename($file)) && is_file($path)) {
+        unlink($path);
+    }
+}

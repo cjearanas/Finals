@@ -13,7 +13,7 @@ const STATUSES = [
     'Resolved'     => ['badge' => 'success',   'tab' => 'resolved', 'icon' => 'bi-check-circle'],
 ];
 
-/** Building => Floor => Rooms. Edit this to match your campus. */
+/** Building => Floor => Rooms.*/
 function campus_layout(): array
 {
     $floors = ['1st Floor' => 1, '2nd Floor' => 2, '3rd Floor' => 3];
@@ -31,7 +31,7 @@ function campus_layout(): array
     return $layout;
 }
 
-/** Concern type => Items. Edit freely. */
+/** Concern type => Items. */
 function concern_items(): array
 {
     return [
@@ -265,11 +265,8 @@ function csrf_valid(?string $token): bool
 {
     return is_string($token) && hash_equals($_SESSION['csrf'] ?? '', $token);
 }
-
-// ---------------------------------------------------------------------------
-// Logged-in user (demo data kept in the session; replace with your auth/database).
+// Logged-in user
 // Demo password: password123
-// ---------------------------------------------------------------------------
 if (!isset($_SESSION['user'])) {
     $_SESSION['user'] = [
         'last_name'     => 'Lastname',

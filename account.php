@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/data.php';
+require_login();
+$me = current_user();
 
 $errors = [];
 $tab    = ($_GET['tab'] ?? '') === 'password' ? 'password' : 'profile';
@@ -14,15 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($action === 'avatar') {
         $file = save_avatar($_FILES['avatar'] ?? [], $errors);
         if ($file) {
-            delete_avatar_file($_SESSION['user']['avatar']);
-            $_SESSION['user']['avatar'] = $file;
+            delete_avatar_file($me['avatar']);
+            user_update($me['id'], ['avatar' => $file]);
             flash_set('success', 'Profile picture updated.');
             header('Location: account.php');
             exit;
         }
     } elseif ($action === 'avatar_remove') {
-        delete_avatar_file($_SESSION['user']['avatar']);
-        $_SESSION['user']['avatar'] = null;
+        delete_avatar_file($me['avatar']);
+        user_update($me['id'], ['avatar' => null]);
         flash_set('success', 'Profile picture removed.');
         header('Location: account.php');
         exit;
@@ -32,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $new = $_POST['new_password'] ?? '';
         $con = $_POST['confirm_password'] ?? '';
 
-        if (!password_verify($cur, $_SESSION['user']['password_hash'])) {
+        if (!password_verify($cur, $me['password_hash'])) {
             $errors[] = 'Your current password is incorrect.';
         }
         if (strlen($new) < 8 || !preg_match('/[A-Za-z]/', $new) || !preg_match('/\d/', $new)) {
@@ -45,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'The new password must be different from the current one.';
         }
         if (!$errors) {
-            $_SESSION['user']['password_hash'] = password_hash($new, PASSWORD_DEFAULT);
+            user_update($me['id'], ['password_hash' => password_hash($new, PASSWORD_DEFAULT)]);
             flash_set('success', 'Your password was changed.');
             header('Location: account.php?tab=password');
             exit;
@@ -53,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$u     = $_SESSION['user'];
+$u     = $me;
 $flash = flash_get();
 
 $pageTitle  = 'Account';
@@ -150,7 +152,7 @@ $initials = $currentUser['initials'];
     </div>
 
     <div class="acct-stats row g-0 text-center">
-      <div class="col py-3"><div class="num"><?= count_reports() ?></div><div class="lbl">Reports Filed</div></div>
+      <div class="col py-3"><div class="num"><?= count_reports() ?></div><div class="lbl"><?= is_admin() ? 'Total Reports' : 'Reports Filed' ?></div></div>
       <div class="col py-3"><div class="num"><?= count_reports('In Progress') ?></div><div class="lbl">In Progress</div></div>
       <div class="col py-3"><div class="num"><?= count_reports('Resolved') ?></div><div class="lbl">Resolved</div></div>
     </div>
@@ -207,7 +209,7 @@ $initials = $currentUser['initials'];
               <input class="form-control" value="<?= e($u['email']) ?>">
             </div>
             <div class="col-md-6">
-              <div class="acct-label mb-1">Student / Staff ID</div>
+              <div class="acct-label mb-1"><?= e(id_label($u['role'])) ?></div>
               <input class="form-control" value="<?= e($u['school_id']) ?>">
             </div>
           </div>
@@ -225,9 +227,13 @@ $initials = $currentUser['initials'];
 
           <div class="acct-label mb-2">Role</div>
           <div class="d-flex gap-4">
-            <?php foreach (['Student', 'Faculty', 'Staff'] as $role): ?>
+            <?php
+              // Student / Faculty accounts show as "User"; Administrator shows as "Admin"
+              $roleGroup = $u['role'] === 'Administrator' ? 'Admin' : ($u['role'] === 'Staff' ? 'Staff' : 'User');
+            ?>
+            <?php foreach (['User', 'Admin', 'Staff'] as $role): ?>
               <div class="form-check">
-                <input class="form-check-input" type="radio" <?= $u['role'] === $role ? 'checked' : '' ?>>
+                <input class="form-check-input" type="radio" <?= $roleGroup === $role ? 'checked' : '' ?>>
                 <label class="form-check-label"><?= e($role) ?></label>
               </div>
             <?php endforeach; ?>

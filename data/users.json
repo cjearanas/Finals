@@ -1,0 +1,44 @@
+[
+    {
+        "avatar": null,
+        "active": true,
+        "contact": "09XX-XXX-XXXX",
+        "id": 1,
+        "role": "Administrator",
+        "last_name": "System",
+        "first_name": "Admin",
+        "mi": "",
+        "email": "admin@pcu.edu.ph",
+        "school_id": "ADMIN-001",
+        "department": "Administration",
+        "password_hash": "$2y$10$FxnHXrPJ4c7kSBS26erH1e7TM0U2grHtm0zJHEchT2WPNi0Dr43zm"
+    },
+    {
+        "avatar": null,
+        "active": true,
+        "contact": "09XX-XXX-XXXX",
+        "id": 2,
+        "role": "Student",
+        "last_name": "Lastname",
+        "first_name": "Firstname",
+        "mi": "M",
+        "email": "User@pcu.edu.ph",
+        "school_id": "2022-00123",
+        "department": "Computer Science",
+        "password_hash": "$2y$10$hCD73Jn1Va9qWNn3SB1hbO9re4cVPU9NDImjF5TonzWVBu5viPbZW"
+    },
+    {
+        "avatar": null,
+        "active": true,
+        "contact": "09XX-XXX-XXXX",
+        "id": 3,
+        "role": "Staff",
+        "last_name": "Santos",
+        "first_name": "Maria",
+        "mi": "L",
+        "email": "maria.santos@pcu-d.edu.ph",
+        "school_id": "STF-2019-014",
+        "department": "Maintenance",
+        "password_hash": "$2y$10$XQE8szJmVL4ue6D0jgBDBO0SW6SBhe8ets6DiAiAdEKvuZg0iMgMK"
+    }
+]

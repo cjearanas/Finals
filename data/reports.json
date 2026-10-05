@@ -1,0 +1,101 @@
+[
+    {
+        "code": "RPT-004",
+        "type": "Electrical",
+        "item": "Projector",
+        "building": "Main Building",
+        "floor": "1st Floor",
+        "room": "Room 101",
+        "location": "Room 101, 1st Floor, Main Building",
+        "description": "broken",
+        "files": [
+            {
+                "name": "fixtrack.png",
+                "file": "38d0fd01c46ce1b582eececc.png",
+                "kind": "image"
+            },
+            {
+                "name": "fixtrack.png",
+                "file": "eced1517bee8b83f31ed52a1.png",
+                "kind": "image"
+            }
+        ],
+        "status": "Resolved",
+        "date": "2026-10-05",
+        "filed": "2026-10-05",
+        "count": 1,
+        "reporters": [
+            2
+        ],
+        "notes": [
+            {
+                "date": "2026-10-05",
+                "text": "broken"
+            }
+        ],
+        "assigned_to": 3,
+        "assigned_at": "2026-10-05",
+        "assign_state": "accepted",
+        "request_from": null
+    },
+    {
+        "code": "RPT-003",
+        "type": "Air Conditioning",
+        "item": "Air Conditioner Unit",
+        "building": "Academic Building",
+        "floor": "3rd Floor",
+        "room": "Room 302",
+        "location": "Room 302, 3rd Floor, Academic Building",
+        "status": "Resolved",
+        "date": "2026-09-28",
+        "filed": "2026-09-28",
+        "count": 1,
+        "files": [],
+        "reporters": [
+            2
+        ],
+        "assigned_to": 3,
+        "assigned_at": "2026-10-05"
+    },
+    {
+        "code": "RPT-002",
+        "type": "Leaking Pipe",
+        "item": "Faucet",
+        "building": "Science Building",
+        "floor": "1st Floor",
+        "room": "Comfort Room",
+        "location": "Comfort Room, 1st Floor, Science Building",
+        "status": "Resolved",
+        "date": "2026-09-25",
+        "filed": "2026-09-25",
+        "count": 1,
+        "files": [],
+        "reporters": [
+            3
+        ],
+        "resolve_request": null,
+        "assigned_to": 3,
+        "assigned_at": "2026-10-05",
+        "assign_state": "accepted",
+        "request_from": null,
+        "sent_back": null,
+        "resolved_at": "2026-10-05"
+    },
+    {
+        "code": "RPT-001",
+        "type": "Broken Window",
+        "item": "Window Glass",
+        "building": "Main Building",
+        "floor": "1st Floor",
+        "room": "Room 101",
+        "location": "Room 101, Main Building",
+        "status": "Resolved",
+        "date": "2026-09-20",
+        "filed": "2026-09-20",
+        "count": 1,
+        "files": [],
+        "reporters": [
+            2
+        ]
+    }
+]

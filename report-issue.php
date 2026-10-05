@@ -1,5 +1,10 @@
 <?php
 require_once __DIR__ . '/includes/data.php';
+require_login();
+if (is_admin()) {            // admins review reports, they don't file them
+    header('Location: dashboard.php');
+    exit;
+}
 
 $campus = campus_layout();
 $items  = concern_items();
@@ -43,10 +48,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (!$errors) {
-            $total = add_report($old['type'], $old['item'], $old['building'], $old['floor'], $old['room'],
-                                $old['description'], $saved);
+            $res = add_report($old['type'], $old['item'], $old['building'], $old['floor'], $old['room'],
+                              $old['description'], $saved, (int)current_user()['id']);
             // Post/Redirect/Get
-            header('Location: maintenance-log.php?' . ($total > 1 ? 'submitted=merged&n=' . $total : 'submitted=1'));
+            $qs = $res['status'] === 'new' ? 'submitted=1'
+                : ($res['status'] === 'merged' ? 'submitted=merged&n=' . $res['count'] : 'submitted=self&n=' . $res['count']);
+            header('Location: maintenance-log.php?' . $qs);
             exit;
         }
     }

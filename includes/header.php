@@ -6,12 +6,18 @@
  */
 require_once __DIR__ . '/data.php';
 
-$nav = [
-    'dashboard' => ['href' => 'index.php',        'icon' => 'bi-house-door',          'label' => 'Dashboard'],
-    'report'    => ['href' => 'report-issue.php',     'icon' => 'bi-exclamation-circle',  'label' => 'Report an Issue'],
-    'log'       => ['href' => 'maintenance-log.php',  'icon' => 'bi-clipboard-check',     'label' => 'Maintenance Log'],
-    'account'   => ['href' => 'account.php',          'icon' => 'bi-person-circle',       'label' => 'Account'],
-];
+require_login();
+
+$nav = ['dashboard' => ['href' => 'dashboard.php', 'icon' => 'bi-house-door', 'label' => 'Dashboard']];
+if (is_admin()) {
+    $nav['log']       = ['href' => 'maintenance-log.php',          'icon' => 'bi-clipboard-check', 'label' => 'Maintenance Log'];
+    $nav['acc-user']  = ['href' => 'admin-accounts.php?type=user',  'icon' => 'bi-person-fill',     'label' => 'User'];
+    $nav['acc-staff'] = ['href' => 'admin-accounts.php?type=staff', 'icon' => 'bi-person-gear',     'label' => 'Maintenance Staff'];
+} else {
+    $nav['report']  = ['href' => 'report-issue.php',    'icon' => 'bi-exclamation-circle', 'label' => 'Report an Issue'];
+    $nav['log']     = ['href' => 'maintenance-log.php', 'icon' => 'bi-clipboard-check',    'label' => 'Maintenance Log'];
+    $nav['account'] = ['href' => 'account.php',         'icon' => 'bi-person-circle',      'label' => 'Account'];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -63,7 +69,7 @@ $nav = [
     <aside class="col-12 col-md-3 col-xl-2 bg-dark text-white d-flex flex-column">
 
       <div class="p-3 border-bottom border-secondary">
-        <a href="index.php" class="text-decoration-none text-white d-flex align-items-center justify-content-center">
+        <a href="dashboard.php" class="text-decoration-none text-white d-flex align-items-center justify-content-center">
           <img src="Images/fixtrack.png" alt="FIXTRACK Logo" class="fixtrack-logo me-2">
           <span class="fw-bold fs-5">FIXTRACK</span>
         </a>
@@ -99,7 +105,7 @@ $nav = [
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" href="account.php">Account</a></li>
-            <li><a class="dropdown-item" href="#">Log out</a></li>
+            <li><a class="dropdown-item" href="logout.php">Log out</a></li>
           </ul>
         </div>
       </header>

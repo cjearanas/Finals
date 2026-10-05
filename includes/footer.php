@@ -2,7 +2,7 @@
 
       <!-- ================= FOOTER ================= -->
       <footer class="fixtrack-footer">
-        <a href="index.php" class="text-decoration-none text-white d-flex align-items-center justify-content-center">
+        <a href="dashboard.php" class="text-decoration-none text-white d-flex align-items-center justify-content-center">
           <img src="Images/fixtrack.png" alt="FIXTRACK Logo" class="footer-logo me-2">
           <span class="fw-bold">FIXTRACK</span>
         </a>
@@ -68,7 +68,59 @@
           <dt>Status</dt><dd><span id="rm-status" class="rm-pill"></span></dd>
           <div id="rm-count-wrap" class="mt-1"><dt>Number of Reports</dt><dd id="rm-count"></dd></div>
           <div id="rm-desc-wrap" class="mt-1"><dt>Description</dt><dd id="rm-desc" class="fw-normal"></dd></div>
+          <div id="rm-assigned-wrap" class="mt-1" hidden><dt>Assigned to</dt><dd id="rm-assigned" class="fw-normal"></dd></div>
+          <div id="rm-by-wrap" class="mt-1" hidden><dt>Reported by</dt><dd id="rm-by" class="fw-normal"></dd></div>
         </dl>
+
+        <?php if (is_admin() || is_staff()): ?>
+          <!-- Task workflow: accept / decline / take / approve -->
+          <div id="rm-workflow" class="mt-3 pt-3 border-top" hidden>
+            <div id="rm-wf-text" class="small fw-semibold mb-2"></div>
+            <div id="rm-wf-buttons" class="d-flex flex-wrap gap-2"></div>
+          </div>
+          <form method="post" action="task-action.php" id="rm-action-form" hidden>
+            <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+            <input type="hidden" name="back" value="<?= e(basename($_SERVER['PHP_SELF'])) ?>">
+            <input type="hidden" name="code" id="rm-act-code">
+            <input type="hidden" name="action" id="rm-act-action">
+          </form>
+
+          <?php if (is_admin()): ?>
+          <form method="post" action="update-status.php" class="mt-3 pt-3 border-top" id="rm-manage" hidden>
+            <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
+            <input type="hidden" name="back" value="<?= e(basename($_SERVER['PHP_SELF'])) ?>">
+            <input type="hidden" name="code" id="rm-code-input">
+
+            <?php if (is_admin()): ?>
+              <label for="rm-assign-select" class="small fw-semibold mb-1">Assign to maintenance staff</label>
+              <select name="assigned_to" id="rm-assign-select" class="form-select form-select-sm mb-2">
+                <option value="">Unassigned</option>
+                <?php foreach (staff_accounts() as $st): ?>
+                  <option value="<?= (int)$st['id'] ?>" <?= $st['active'] ? '' : 'disabled' ?>>
+                    <?= e(full_name($st)) ?><?= $st['active'] ? '' : ' (disabled)' ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            <?php endif; ?>
+
+            <label for="rm-status-select" class="small fw-semibold mb-1">Update status</label>
+            <div class="d-flex gap-2">
+              <select name="status" id="rm-status-select" class="form-select form-select-sm">
+                <?php foreach (array_keys(STATUSES) as $label): ?><option><?= e($label) ?></option><?php endforeach; ?>
+              </select>
+              <button type="button" id="rm-save" class="btn btn-sm text-white px-3" style="background:#012a5e">Save</button>
+            </div>
+          </form>
+          <?php endif; ?>
+
+          <div id="rm-confirm" class="alert alert-warning mt-3 mb-0 py-2" role="alert" hidden>
+            <div id="rm-confirm-text" class="small fw-semibold mb-2"></div>
+            <div class="d-flex gap-2">
+              <button type="button" id="rm-confirm-yes" class="btn btn-sm btn-dark">Yes, confirm</button>
+              <button type="button" id="rm-confirm-no" class="btn btn-sm btn-outline-secondary">Cancel</button>
+            </div>
+          </div>
+        <?php endif; ?>
       </div>
 
     </div>
@@ -157,12 +209,139 @@
     });
     $('rm-desc-wrap').hidden = d.descriptions.length === 0;
 
+    var by = $('rm-by');                                   // admin only
+    if (by) {
+      by.textContent = (d.reporters || []).join(', ');
+      $('rm-by-wrap').hidden = !(d.reporters && d.reporters.length);
+    }
+    $('rm-assigned').textContent = d.assigned + (d.assignState === 'pending' ? ' (awaiting acceptance)' : '');
+    $('rm-assigned-wrap').hidden = !d.assigned;
+
+    currentD = d;
+    var cf = $('rm-confirm');
+    if (cf) cf.hidden = true;
+    renderWorkflow(d);
+
+    var manage = $('rm-manage');                           // admin / maintenance staff only
+    if (manage) {
+      manage.hidden = !d.canUpdate;
+      $('rm-code-input').value = d.code;
+      $('rm-status-select').value = d.status;
+      var as = $('rm-assign-select');
+      if (as) as.value = d.assignedId ? String(d.assignedId) : '';
+    }
+
     showMedia(d.files[0]);
     fillThumbs(d.files);
   });
 
   // Stop any playing video when the popup closes
   modal.addEventListener('hidden.bs.modal', function () { $('rm-media').innerHTML = ''; });
+
+
+  // ----- Confirmation + task workflow (admin / maintenance staff) -----
+  var currentD = null, confirmFn = null;
+
+  function ask(message, fn) {
+    var panel = $('rm-confirm');
+    if (!panel) { fn(); return; }
+    $('rm-confirm-text').textContent = message;
+    confirmFn = fn;
+    panel.hidden = false;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  if ($('rm-confirm-yes')) {
+    $('rm-confirm-yes').addEventListener('click', function () {
+      var f = confirmFn;
+      $('rm-confirm').hidden = true;
+      confirmFn = null;
+      if (f) f();
+    });
+    $('rm-confirm-no').addEventListener('click', function () {
+      $('rm-confirm').hidden = true;
+      confirmFn = null;
+    });
+  }
+
+  function sendAction(action) {
+    $('rm-act-code').value = currentD.code;
+    $('rm-act-action').value = action;
+    $('rm-action-form').submit();
+  }
+
+  function wfButton(label, cls, message, action) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-sm ' + cls;
+    b.textContent = label;
+    b.addEventListener('click', function () { ask(message, function () { sendAction(action); }); });
+    $('rm-wf-buttons').appendChild(b);
+  }
+
+  function renderWorkflow(d) {
+    var box = $('rm-workflow');
+    if (!box) return;
+    var text = '';
+    $('rm-wf-buttons').innerHTML = '';
+
+    if (d.viewer === 'staff') {
+      if (d.mine && d.assignState === 'pending') {
+        text = 'The admin assigned this task to you. Please accept or decline it.';
+        wfButton('Accept task', 'btn-success', 'Accept task ' + d.code + '? Its status will change to In Progress.', 'accept');
+        wfButton('Decline', 'btn-outline-danger', 'Decline task ' + d.code + '? It will go back to the admin to assign again.', 'decline');
+      } else if (d.mine && d.assignState === 'accepted' && d.status !== 'Resolved') {
+        if (d.resolvePending) {
+          text = 'You marked this task as resolved. Waiting for the admin to confirm.';
+        } else {
+          text = d.sentBack
+            ? 'The admin sent this task back. Please check it, then mark it as resolved again.'
+            : 'Finished the work? Mark it as resolved and the admin will confirm it.';
+          wfButton('Mark as resolved', 'btn-success', 'Mark ' + d.code + ' as resolved? The admin has to confirm it before it is closed.', 'request_resolve');
+        }
+      } else if (d.canTake) {
+        text = 'This task is open. You can ask to take it, and the admin will confirm.';
+        wfButton('Take this task', 'btn-primary', 'Ask to take ' + d.code + '? It only becomes yours after the admin approves it.', 'take');
+      } else if (d.requestedByMe) {
+        text = 'You asked to take this task. Waiting for the admin to approve.';
+        wfButton('Cancel request', 'btn-outline-secondary', 'Cancel your request for ' + d.code + '?', 'cancel_request');
+      } else if (d.hasRequest && !d.assigned) {
+        text = 'Another staff member already asked to take this task.';
+      }
+    } else if (d.viewer === 'admin') {
+      if (d.resolvePending) {
+        text = d.resolveBy + ' marked this task as resolved. Please check the work, then confirm.';
+        wfButton('Confirm resolved', 'btn-success', 'Confirm that ' + d.code + ' is resolved? It will be closed.', 'confirm_resolved');
+        wfButton('Send back', 'btn-outline-danger', 'Send ' + d.code + ' back to ' + d.resolveBy + '? It stays In Progress.', 'reject_resolved');
+      } else if (d.hasRequest) {
+        text = d.requestName + ' asked to take this task.';
+        wfButton('Approve', 'btn-success', 'Approve ' + d.requestName + ' for ' + d.code + '? The task will be assigned to them and set to In Progress.', 'approve_request');
+        wfButton('Reject', 'btn-outline-danger', 'Reject the request from ' + d.requestName + ' for ' + d.code + '?', 'reject_request');
+      } else if (d.assignState === 'pending') {
+        text = 'Waiting for ' + d.assigned + ' to accept this task.';
+      } else if (d.declinedNote) {
+        text = d.declinedNote + '. This task is unassigned.';
+      }
+    }
+    box.hidden = text === '';
+    $('rm-wf-text').textContent = text;
+  }
+
+  // Save: ask for confirmation first when the assignment changes
+  var saveBtn = $('rm-save');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', function () {
+      var form = $('rm-manage');
+      var sel = $('rm-assign-select');
+      if (sel && currentD && sel.value !== String(currentD.assignedId || '')) {
+        var msg = sel.value === ''
+          ? 'Remove the current assignment from ' + currentD.code + '?'
+          : 'Assign ' + currentD.code + ' to ' + sel.options[sel.selectedIndex].text.trim() + '? They will be asked to accept the task.';
+        ask(msg, function () { form.submit(); });
+      } else {
+        form.submit();
+      }
+    });
+  }
 
   // Keyboard access: Enter / Space opens the focused row
   document.addEventListener('keydown', function (e) {

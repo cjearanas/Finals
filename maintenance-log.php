@@ -11,11 +11,22 @@ foreach (STATUSES as $label => $s) {
 $first = true;
 ?>
 
-<?php if (isset($_GET['submitted'])): ?>
-  <div class="alert alert-<?= $_GET['submitted'] === 'merged' ? 'info' : 'success' ?> alert-dismissible fade show" role="alert">
-    <?php if ($_GET['submitted'] === 'merged'): ?>
+<?php if ($flash = flash_get()): ?>
+  <div class="alert alert-<?= e($flash['type']) ?> alert-dismissible fade show" role="alert">
+    <?= e($flash['msg']) ?>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<?php endif; ?>
+
+<?php render_task_alerts(); ?>
+
+<?php if (isset($_GET['submitted'])): $sub = (string)$_GET['submitted']; ?>
+  <div class="alert alert-<?= $sub === '1' ? 'success' : 'info' ?> alert-dismissible fade show" role="alert">
+    <?php if ($sub === 'merged'): ?>
       This issue was already reported, so your report was added to it.
       It now has <strong><?= (int)($_GET['n'] ?? 2) ?> reports</strong> and is prioritized.
+    <?php elseif ($sub === 'self'): ?>
+      You already reported this issue, so your new photos and details were added to your existing report.
     <?php else: ?>
       Your report was submitted and is now <strong>Under Review</strong>.
     <?php endif; ?>
@@ -118,6 +129,10 @@ $first = true;
   }
 
   input.addEventListener('input', run);
+
+  // Allow links like maintenance-log.php?q=assigned+to+you
+  var q = new URLSearchParams(window.location.search).get('q');
+  if (q) { input.value = q; run(); }
 })();
 </script>
 

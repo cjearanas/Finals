@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="mb-3">
           <label for="email" class="login-label d-block">Email</label>
           <input type="email" id="email" name="email" class="form-control login-input" value="<?= e($email) ?>"
-                 placeholder="name@pcu-d.edu.ph" required autocomplete="username">
+                 placeholder="email@pcu.edu.ph" required autocomplete="username">
         </div>
 
         <div class="mb-3" id="idField" <?= $tab === 'admin' ? 'hidden' : '' ?>>

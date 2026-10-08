@@ -13,10 +13,13 @@ if (is_admin()) {
     $nav['log']       = ['href' => 'maintenance-log.php',          'icon' => 'bi-clipboard-check', 'label' => 'Maintenance Log'];
     $nav['acc-user']  = ['href' => 'admin-accounts.php?type=user',  'icon' => 'bi-person-fill',     'label' => 'User'];
     $nav['acc-staff'] = ['href' => 'admin-accounts.php?type=staff', 'icon' => 'bi-person-gear',     'label' => 'Maintenance Staff'];
+} elseif (is_staff()) {
+    $nav['log']       = ['href' => 'maintenance-log.php',                 'icon' => 'bi-clipboard-check', 'label' => 'Maintenance Log'];
+    $nav['awaiting']  = ['href' => 'maintenance-log.php?q=awaiting+your+acceptance', 'icon' => 'bi-bell', 'label' => 'Awaiting Acceptance'];
+    $nav['assigned']  = ['href' => 'maintenance-log.php?q=assigned+to+you', 'icon' => 'bi-tools',         'label' => 'Assigned Task'];
 } else {
     $nav['report']  = ['href' => 'report-issue.php',    'icon' => 'bi-exclamation-circle', 'label' => 'Report an Issue'];
     $nav['log']     = ['href' => 'maintenance-log.php', 'icon' => 'bi-clipboard-check',    'label' => 'Maintenance Log'];
-    $nav['account'] = ['href' => 'account.php',         'icon' => 'bi-person-circle',      'label' => 'Account'];
 }
 ?>
 <!DOCTYPE html>

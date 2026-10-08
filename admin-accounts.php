@@ -64,7 +64,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($f['school_id'] === '' || mb_strlen($f['school_id']) > 30) {
             $errors[] = 'Please enter a ' . ($type === 'staff' ? 'Staff ID' : 'User ID') . ' (max 30 characters).';
         }
-        if (!in_array($f['department'], DEPARTMENTS, true)) {
+        $keepsOld = $target && $target['department'] === $f['department'];     // an older department can stay as it is
+        if (!in_array($f['department'], DEPARTMENTS, true) && !$keepsOld) {
             $errors[] = 'Please select a department.';
         }
         if (!preg_match('/^[0-9xX+\-\s()]{0,20}$/', $f['contact'])) {
@@ -266,6 +267,14 @@ document.addEventListener('DOMContentLoaded', function () {
     $('f-id').value = editing ? a.id : 0;
     fields.forEach(function (k) {
       var el = $('f-' + k);
+      if (k === 'department') {                         // an account may still have an older department
+        el.querySelectorAll('option[data-old]').forEach(function (o) { o.remove(); });
+        if (a && a.department && !Array.prototype.some.call(el.options, function (o) { return o.value === a.department; })) {
+          var o = new Option(a.department + ' (old)', a.department);
+          o.dataset.old = '1';
+          el.add(o);
+        }
+      }
       el.value = a && a[k] !== undefined ? a[k] : (k === 'role' ? el.options[0].value : '');
     });
     $('f-password').value = '';

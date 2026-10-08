@@ -18,8 +18,11 @@ const STATUSES = [
 
 const ROLES_USER  = ['Student', 'Faculty'];
 const ROLES_STAFF = ['Staff'];
-const DEPARTMENTS = ['Computer Science', 'Information Technology', 'Engineering', 'Business Administration',
-                     'Education', 'Nursing', 'Maintenance', 'Security', 'Administration', 'Other'];
+const DEPARTMENTS = [
+    'COI', 'CET', 'CBAA', 'CSW', 'CCJ', 'CAS', 'CNHS', 'CHTM', 'College of Law', 'Graduate Studies',
+    'ICTC', 'GSO', 'NSTP', 'Clinic', 'Treasury', 'Auditing', 'Registrar',
+    'SHS', 'JHS', 'Elementary', 'Kiddie College',
+];
 
 /** Escape output */
 function e(?string $s): string
@@ -41,31 +44,31 @@ function db_default(string $name): array
     if ($name === 'users') {
         $blank = ['avatar' => null, 'active' => true, 'contact' => '09XX-XXX-XXXX'];
         return [
-            $blank + ['id' => 1, 'role' => 'Administrator', 'last_name' => 'System', 'first_name' => 'Admin', 'mi' => '',
-                      'email' => 'admin@pcu-d.edu.ph', 'school_id' => 'ADMIN-001', 'department' => 'Administration',
+            $blank + ['id' => 1, 'role' => 'Administrator', 'last_name' => 'Admin', 'first_name' => 'Admin', 'mi' => '',
+                      'email' => 'admin@pcu.edu.ph', 'school_id' => 'ADMIN-001', 'department' => 'ICTC',
                       'password_hash' => password_hash('admin123', PASSWORD_DEFAULT)],
-            $blank + ['id' => 2, 'role' => 'Student', 'last_name' => 'Lastname', 'first_name' => 'Firstname', 'mi' => 'M',
-                      'email' => 'firstname.lastname@pcu-d.edu.ph', 'school_id' => '2022-00123', 'department' => 'Computer Science',
-                      'password_hash' => password_hash('password123', PASSWORD_DEFAULT)],
-            $blank + ['id' => 3, 'role' => 'Staff', 'last_name' => 'Santos', 'first_name' => 'Maria', 'mi' => 'L',
-                      'email' => 'maria.santos@pcu-d.edu.ph', 'school_id' => 'STF-2019-014', 'department' => 'Maintenance',
+            $blank + ['id' => 2, 'role' => 'Student', 'last_name' => 'User', 'first_name' => 'User', 'mi' => 'U',
+                      'email' => 'user@pcu.edu.ph', 'school_id' => '2026-001', 'department' => 'COI',
+                      'password_hash' => password_hash('user123', PASSWORD_DEFAULT)],
+            $blank + ['id' => 3, 'role' => 'Staff', 'last_name' => 'maintenance', 'first_name' => 'Staff', 'mi' => 'M',
+                      'email' => 'mstaff@pcu.edu.ph', 'school_id' => 'STF-001', 'department' => 'Maintenance',
                       'password_hash' => password_hash('staff123', PASSWORD_DEFAULT)],
         ];
     }
     if ($name === 'reports') {
         return [
             ['code' => 'RPT-003', 'type' => 'Air Conditioning', 'item' => 'Air Conditioner Unit',
-             'building' => 'Academic Building', 'floor' => '3rd Floor', 'room' => 'Room 302',
-             'location' => 'Room 302, 3rd Floor, Academic Building', 'status' => 'In Progress',
+             'building' => 'New Academic Building', 'floor' => '3rd Floor', 'room' => 'Room 302',
+             'location' => 'Room 302, 3rd Floor, New Academic Building', 'status' => 'In Progress',
              'date' => '2026-09-28', 'filed' => '2026-09-28', 'count' => 1, 'files' => [], 'reporters' => [2],
              'assigned_to' => 3, 'assign_state' => 'accepted'],
             ['code' => 'RPT-002', 'type' => 'Leaking Pipe', 'item' => 'Faucet',
-             'building' => 'Science Building', 'floor' => '1st Floor', 'room' => 'Comfort Room',
-             'location' => 'Comfort Room, 1st Floor, Science Building', 'status' => 'Under Review',
+             'building' => 'College Building', 'floor' => '1st Floor', 'room' => 'Comfort Room',
+             'location' => 'Comfort Room, 1st Floor, College Building', 'status' => 'Under Review',
              'date' => '2026-09-25', 'filed' => '2026-09-25', 'count' => 1, 'files' => [], 'reporters' => [3]],
             ['code' => 'RPT-001', 'type' => 'Broken Window', 'item' => 'Window Glass',
-             'building' => 'Main Building', 'floor' => '1st Floor', 'room' => 'Room 101',
-             'location' => 'Room 101, Main Building', 'status' => 'Resolved',
+             'building' => 'Junior High School', 'floor' => '1st Floor', 'room' => 'Room 101',
+             'location' => 'Room 101, 1st Floor, Junior High School', 'status' => 'Resolved',
              'date' => '2026-09-20', 'filed' => '2026-09-20', 'count' => 1, 'files' => [], 'reporters' => [2]],
         ];
     }
@@ -236,11 +239,14 @@ function campus_layout(): array
 {
     $floors = ['1st Floor' => 1, '2nd Floor' => 2, '3rd Floor' => 3];
     $layout = [];
-    foreach (['Main Building', 'Academic Building', 'Science Building'] as $building) {
+    foreach (['New Academic Building', 'College Building', 'Junior High School', 'Elementary Building'] as $building) {
         foreach ($floors as $floor => $n) {
             $rooms = [];
             for ($i = 1; $i <= 5; $i++) {
                 $rooms[] = 'Room ' . $n . '0' . $i;
+            }
+            if ($building === 'New Academic Building' && $floor === '3rd Floor') {
+                array_push($rooms, 'Computer Laboratory 7', 'Computer Laboratory 8', 'Computer Laboratory 9');
             }
             $rooms[] = 'Comfort Room';
             $layout[$building][$floor] = $rooms;
@@ -258,8 +264,25 @@ function concern_items(): array
         'Broken Window'    => ['Window Glass', 'Window Frame', 'Window Lock', 'Curtain / Blinds', 'Other'],
         'Electrical'       => ['Light Fixture', 'Power Outlet', 'Switch', 'Electric Fan', 'Projector', 'Circuit Breaker', 'Other'],
         'Furniture'        => ['Chair', 'Desk', 'Whiteboard', 'Cabinet', 'Door', 'Other'],
+        'Computer / Network' => ['Desktop Computer', 'Monitor', 'Keyboard', 'Mouse', 'Internet / Network', 'Printer', 'Other'],
         'Other'            => ['Other'],
     ];
+}
+
+/**
+ * Which concern types make sense for a room. Edit freely.
+ * A comfort room has plumbing but no air conditioning; other rooms have no plumbing;
+ * computer laboratories also get the Computer / Network concern.
+ */
+function room_concerns(string $room): array
+{
+    if (stripos($room, 'Comfort Room') !== false) {
+        return ['Leaking Pipe', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
+    }
+    if (stripos($room, 'Computer Laboratory') !== false) {
+        return ['Computer / Network', 'Air Conditioning', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
+    }
+    return ['Air Conditioning', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
 }
 
 // ---------------------------------------------------------------------------
@@ -522,6 +545,14 @@ function count_assigned_to_me(): int
 {
     $me = current_user();
     return $me ? count(array_filter(get_reports(), fn($r) => ($r['assigned_to'] ?? null) === $me['id'] && $r['status'] !== 'Resolved')) : 0;
+}
+
+/** Tasks the current user accepted and has not finished yet */
+function count_active_tasks(): int
+{
+    $me = current_user();
+    return $me ? count(array_filter(get_reports(), fn($r) => ($r['assigned_to'] ?? null) === $me['id']
+                                                          && assign_state($r) === 'accepted' && $r['status'] !== 'Resolved')) : 0;
 }
 
 function count_awaiting_acceptance(): int

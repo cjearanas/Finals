@@ -1,6 +1,16 @@
 <?php
 $pageTitle  = 'Maintenance Log';
+require_once __DIR__ . '/includes/data.php';
+
 $activePage = 'log';
+if (is_staff()) {                                 // staff have shortcuts to filtered views of this page
+    $q = strtolower(trim((string)($_GET['q'] ?? '')));
+    if (str_starts_with($q, 'awaiting your acceptance')) {
+        $activePage = 'awaiting';
+    } elseif (str_starts_with($q, 'assigned to you')) {
+        $activePage = 'assigned';
+    }
+}
 require __DIR__ . '/includes/header.php';
 
 // Tabs: All + one per status

@@ -1,13 +1,21 @@
 <?php
 require_once __DIR__ . '/includes/data.php';
 require_login();
-if (is_admin()) {            // admins review reports, they don't file them
+if (is_admin() || is_staff()) {   // admins and maintenance staff handle reports, they don't file them
     header('Location: dashboard.php');
     exit;
 }
 
 $campus = campus_layout();
 $items  = concern_items();
+$roomTypes = [];
+foreach ($campus as $floors) {
+    foreach ($floors as $rooms) {
+        foreach ($rooms as $rm) {
+            $roomTypes[$rm] = room_concerns($rm);
+        }
+    }
+}
 $errors = [];
 $old    = ['building' => '', 'floor' => '', 'room' => '', 'type' => '', 'item' => '', 'description' => ''];
 
@@ -30,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!in_array($old['room'], $campus[$old['building']][$old['floor']], true)) {
             $errors[] = 'Please select a room.';
         }
-        if (!isset($items[$old['type']])) {
-            $errors[] = 'Please select a concern type.';
+        if (!isset($items[$old['type']]) || !in_array($old['type'], room_concerns($old['room']), true)) {
+            $errors[] = 'Please select a concern type that fits the room.';
         } elseif (!in_array($old['item'], $items[$old['type']], true)) {
             $errors[] = 'Please select an item.';
         }
@@ -173,6 +181,7 @@ require __DIR__ . '/includes/header.php';
   // ---------- Dependent dropdowns ----------
   const campus = <?= json_encode($campus, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
   const items  = <?= json_encode($items,  JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  const roomTypes = <?= json_encode($roomTypes, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
   const old    = <?= json_encode($old,    JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
   const $ = id => document.getElementById(id);
@@ -189,18 +198,29 @@ require __DIR__ . '/includes/header.php';
   const floorsOf = b => Object.keys(campus[b] || {});
   const roomsOf  = (b, f) => (campus[b] && campus[b][f]) || [];
   const itemsOf  = t => items[t] || [];
+  const typesOf  = r => roomTypes[r] || [];
 
   fill(building, Object.keys(campus), 'Select a building', old.building);
   fill(floor, floorsOf(building.value),                 'Select a floor',    old.floor);
   fill(room,  roomsOf(building.value, floor.value),     'Select a room',     old.room);
-  fill(type,  Object.keys(items),                       'Select a concern type', old.type);
+  fill(type,  typesOf(room.value),                      'Select a concern type', old.type);
   fill(item,  itemsOf(type.value),                      'Select an item',    old.item);
 
+  // Each dropdown depends on the one before it: building > floor > room > concern type > item
+  function resetTypeAndItem() {
+    fill(type, typesOf(room.value), 'Select a concern type');
+    fill(item, [], 'Select an item');
+  }
   building.addEventListener('change', () => {
     fill(floor, floorsOf(building.value), 'Select a floor');
     fill(room, [], 'Select a room');
+    resetTypeAndItem();
   });
-  floor.addEventListener('change', () => fill(room, roomsOf(building.value, floor.value), 'Select a room'));
+  floor.addEventListener('change', () => {
+    fill(room, roomsOf(building.value, floor.value), 'Select a room');
+    resetTypeAndItem();
+  });
+  room.addEventListener('change', resetTypeAndItem);
   type.addEventListener('change',  () => fill(item, itemsOf(type.value), 'Select an item'));
 
   // ---------- File upload (images / videos only, 50MB) ----------

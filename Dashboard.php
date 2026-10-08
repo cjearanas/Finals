@@ -58,7 +58,7 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
 <?php elseif (is_staff()): ?>
 
   <!-- ================= MAINTENANCE STAFF DASHBOARD ================= -->
-  <div class="row g-3">
+  <div class="row g-3 justify-content-center">
 
     <div class="col-md-8">
       <div class="h-100 bg-dark text-white rounded p-3 fs-4 fw-semibold">
@@ -68,15 +68,8 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
 
     <div class="col-md-4">
       <div class="h-100 bg-secondary text-white rounded p-3 fw-semibold d-flex align-items-center justify-content-center">
-        Issues Reported: <?= count_reported_by_me() ?>
+        Active Tasks: <?= count_active_tasks() ?>
       </div>
-    </div>
-
-    <div class="col-md-4">
-      <a href="report-issue.php" class="<?= $boxBase ?> text-bg-danger">
-        <i class="bi bi-exclamation-triangle fs-1"></i>
-        Report an Issue
-      </a>
     </div>
 
     <div class="col-md-4">
@@ -106,7 +99,7 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
       <a href="maintenance-log.php?q=assigned+to+you" class="<?= $boxBase ?> text-bg-primary">
         <span class="position-absolute top-0 end-0 m-2 small"><?= count_assigned_to_me() ?></span>
         <i class="bi bi-tools fs-1"></i>
-        Assigned to Me
+        Assigned Task
       </a>
     </div>
 

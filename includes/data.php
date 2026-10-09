@@ -289,7 +289,7 @@ function room_concerns(string $room): array
 // Reports
 // ---------------------------------------------------------------------------
 /** Admins see every report. Staff see their own, the ones assigned to them and open unassigned tasks. Others see only their own. */
-function get_reports(?string $status = null): array
+function get_reports(?string $status = null, ?string $view = null): array
 {
     $reports = db_read('reports');
     $me = current_user();
@@ -301,6 +301,16 @@ function get_reports(?string $status = null): array
             || ($r['request_from'] ?? null) === $me['id']
             || (is_staff() && empty($r['assigned_to']) && ($r['status'] ?? '') !== 'Resolved')   // open tasks anyone on staff can take
         )));
+    }
+    // Staff shortcuts: only the tasks assigned to the logged-in account
+    //   'assigned' = accepted tasks, 'awaiting' = tasks still waiting for this person to accept
+    if ($view !== null) {
+        $reports = array_values(array_filter($reports, function ($r) use ($view, $me) {
+            if (!$me || ($r['assigned_to'] ?? null) !== $me['id']) {
+                return false;
+            }
+            return assign_state($r) === ($view === 'awaiting' ? 'pending' : 'accepted');
+        }));
     }
     if ($status !== null) {
         $reports = array_values(array_filter($reports, fn($r) => $r['status'] === $status));
@@ -314,9 +324,9 @@ function get_reports(?string $status = null): array
     return $reports;
 }
 
-function count_reports(?string $status = null): int
+function count_reports(?string $status = null, ?string $view = null): int
 {
-    return count(get_reports($status));
+    return count(get_reports($status, $view));
 }
 
 /**
@@ -604,7 +614,7 @@ function render_task_alerts(): void
         if ($n > 0) { ?>
           <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><i class="bi bi-bell-fill me-2"></i>You have <strong><?= $n ?></strong> task<?= $n > 1 ? 's' : '' ?> waiting for your acceptance.</span>
-            <a class="btn btn-sm btn-warning" href="maintenance-log.php?q=awaiting+your+acceptance">Review</a>
+            <a class="btn btn-sm btn-warning" href="maintenance-log.php?view=awaiting">Review</a>
           </div>
         <?php }
     }

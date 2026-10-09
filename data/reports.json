@@ -1,5 +1,38 @@
 [
     {
+        "code": "RPT-007",
+        "type": "Air Conditioning",
+        "item": "Air Conditioner Unit",
+        "building": "College Building",
+        "floor": "1st Floor",
+        "room": "Room 102",
+        "location": "Room 102, 1st Floor, College Building",
+        "description": "Broken aircon",
+        "files": [
+            {
+                "name": "fixtrack.png",
+                "file": "f243cd8e3aba66c0c81300b7.png",
+                "kind": "image"
+            }
+        ],
+        "status": "In Progress",
+        "date": "2026-10-09",
+        "filed": "2026-10-09",
+        "count": 1,
+        "reporters": [
+            2
+        ],
+        "resolve_request": {
+            "by": 3,
+            "date": "2026-10-09"
+        },
+        "assigned_to": 3,
+        "assigned_at": "2026-10-09",
+        "assign_state": "accepted",
+        "request_from": null,
+        "sent_back": null
+    },
+    {
         "code": "RPT-006",
         "type": "Air Conditioning",
         "item": "Air Conditioner Unit",
@@ -15,13 +48,18 @@
                 "kind": "image"
             }
         ],
-        "status": "Under Review",
+        "status": "In Progress",
         "date": "2026-10-07",
         "filed": "2026-10-07",
         "count": 1,
         "reporters": [
             3
-        ]
+        ],
+        "request_from": null,
+        "resolve_request": null,
+        "assigned_to": 3,
+        "assigned_at": "2026-10-09",
+        "assign_state": "accepted"
     },
     {
         "code": "RPT-005",

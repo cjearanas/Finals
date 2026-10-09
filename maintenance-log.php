@@ -3,13 +3,15 @@ $pageTitle  = 'Maintenance Log';
 require_once __DIR__ . '/includes/data.php';
 
 $activePage = 'log';
-if (is_staff()) {                                 // staff have shortcuts to filtered views of this page
-    $q = strtolower(trim((string)($_GET['q'] ?? '')));
-    if (str_starts_with($q, 'awaiting your acceptance')) {
-        $activePage = 'awaiting';
-    } elseif (str_starts_with($q, 'assigned to you')) {
-        $activePage = 'assigned';
-    }
+
+// Staff shortcuts: ?view=assigned or ?view=awaiting show only the tasks assigned to the logged-in account
+$view = (is_staff() && in_array($_GET['view'] ?? '', ['assigned', 'awaiting'], true)) ? $_GET['view'] : null;
+if ($view === 'assigned') {
+    $pageTitle  = 'Assigned Task';
+    $activePage = 'assigned';
+} elseif ($view === 'awaiting') {
+    $pageTitle  = 'Awaiting Acceptance';
+    $activePage = 'awaiting';
 }
 require __DIR__ . '/includes/header.php';
 
@@ -46,7 +48,7 @@ $first = true;
 
 <div class="card">
   <div class="card-header bg-dark text-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-    <span class="fw-semibold">Maintenance Log</span>
+    <span class="fw-semibold"><?= e($pageTitle) ?></span>
 
     <div class="input-group input-group-sm" style="max-width: 280px;">
       <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
@@ -66,7 +68,7 @@ $first = true;
                 data-bs-toggle="tab" data-bs-target="#tab-<?= e($id) ?>"
                 type="button" role="tab">
           <?= e($tab['label']) ?>
-          <span class="badge text-bg-secondary ms-2"><?= count_reports($tab['status']) ?></span>
+          <span class="badge text-bg-secondary ms-2"><?= count_reports($tab['status'], $view) ?></span>
         </button>
       </li>
     <?php endforeach; ?>
@@ -74,7 +76,7 @@ $first = true;
 
   <!-- Tab content -->
   <div class="tab-content">
-    <?php foreach ($tabs as $id => $tab): $reports = get_reports($tab['status']); ?>
+    <?php foreach ($tabs as $id => $tab): $reports = get_reports($tab['status'], $view); ?>
       <div class="tab-pane fade <?= $id === 'all' ? 'show active' : '' ?>" id="tab-<?= e($id) ?>" role="tabpanel">
         <div class="list-group list-group-flush report-scroll" data-visible="4">
           <?php foreach ($reports as $report): ?>

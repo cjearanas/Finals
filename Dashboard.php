@@ -88,7 +88,7 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
     </div>
 
     <div class="col-md-4">
-      <a href="maintenance-log.php?q=awaiting+your+acceptance" class="<?= $boxBase ?> text-bg-warning">
+      <a href="maintenance-log.php?view=awaiting" class="<?= $boxBase ?> text-bg-warning">
         <span class="position-absolute top-0 end-0 m-2 small"><?= count_awaiting_acceptance() ?></span>
         <i class="bi bi-bell fs-1"></i>
         Awaiting Acceptance
@@ -96,15 +96,15 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
     </div>
 
     <div class="col-md-4">
-      <a href="maintenance-log.php?q=assigned+to+you" class="<?= $boxBase ?> text-bg-primary">
-        <span class="position-absolute top-0 end-0 m-2 small"><?= count_assigned_to_me() ?></span>
+      <a href="maintenance-log.php?view=assigned" class="<?= $boxBase ?> text-bg-primary">
+        <span class="position-absolute top-0 end-0 m-2 small"><?= count_active_tasks() ?></span>
         <i class="bi bi-tools fs-1"></i>
         Assigned Task
       </a>
     </div>
 
     <div class="col-md-4">
-      <a href="maintenance-log.php?q=assigned+to+you+resolved" class="<?= $boxBase ?> text-bg-success">
+      <a href="maintenance-log.php?view=assigned#tab-resolved" class="<?= $boxBase ?> text-bg-success">
         <span class="position-absolute top-0 end-0 m-2 small"><?= count_resolved_by_me() ?></span>
         <i class="bi bi-check-circle fs-1"></i>
         Resolved

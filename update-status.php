@@ -57,9 +57,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && csrf_valid($_POST['csrf'] ?? null))
                 $done = true;                                              // message already set
             }
         }
+        $before = $report['status'] ?? '';
         if ($valid && update_report($code, $status, ['assignee' => $assignee])) {
             $done = true;
+            // Tell the people who reported it when work on it starts
+            $after = report_find($code);
+            if ($after && $before !== 'In Progress' && ($after['status'] ?? '') === 'In Progress') {
+                $who = !empty($after['assigned_to']) ? person_name((int)$after['assigned_to']) : '';
+                notify($after['reporters'] ?? [], 'Your report ' . $code . ' (' . $after['type'] . ' at ' . $after['location'] . ') is now In Progress.'
+                    . ($who !== '' ? ' ' . $who . ' is working on it.' : ''), $code, 'tools');
+            }
             if ($assignee !== $prev) {
+                if ($assignee !== null) {
+                    notify([$assignee], $code . ' was assigned to you: ' . $report['type'] . ' at ' . $report['location'] . '.', $code, 'person-check');
+                }
+                if ($prev !== null) {
+                    notify([(int)$prev], $code . ' was taken off your list by the admin.', $code, 'person-dash');
+                }
                 $msg = $assignee === null
                     ? 'Assignment removed from ' . $code . '.'
                     : $code . ' was assigned to ' . full_name(user_find($assignee)) . ' and it is now In Progress.';

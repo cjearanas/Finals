@@ -352,7 +352,7 @@ function add_report(string $type, string $item, string $building, string $floor,
                 if ($description !== '') {
                     $r['notes'][] = ['date' => date('Y-m-d'), 'text' => $description];
                 }
-                $result = ['status' => $already ? 'self' : 'merged', 'count' => $r['count'] ?? 1];
+                $result = ['status' => $already ? 'self' : 'merged', 'count' => $r['count'] ?? 1, 'code' => $r['code']];
                 unset($r);
                 return $reports;
             }
@@ -363,6 +363,7 @@ function add_report(string $type, string $item, string $building, string $floor,
         foreach ($reports as $x) {
             $max = max($max, (int)substr($x['code'], 4));
         }
+        $result['code'] = sprintf('RPT-%03d', $max + 1);
         array_unshift($reports, [
             'code'        => sprintf('RPT-%03d', $max + 1),
             'type'        => $type,
@@ -381,6 +382,15 @@ function add_report(string $type, string $item, string $building, string $floor,
         ]);
         return $reports;
     });
+
+    // Tell the admin about every report, and the matching maintenance staff about new open tasks
+    $where = $room . ', ' . $floor . ', ' . $building;
+    if ($result['status'] === 'new') {
+        notify(admin_ids(), 'New report ' . $result['code'] . ': ' . $type . ' (' . $item . ') at ' . $where . '.', $result['code'], 'file-earmark-plus');
+        notify(staff_ids_for(['type' => $type]), 'New task you can take: ' . $result['code'] . ', ' . $type . ' at ' . $where . '.', $result['code'], 'tools');
+    } elseif ($result['status'] === 'merged') {
+        notify(admin_ids(), 'Another report for ' . $result['code'] . ' (' . $type . ' at ' . $where . '). It now has ' . $result['count'] . ' reports.', $result['code'], 'files');
+    }
 
     return $result;
 }
@@ -426,6 +436,91 @@ function my_job_load(): int
         $load = $me ? active_jobs($me['id'], $reports) + pending_requests($me['id'], $reports) : 0;
     }
     return $load;
+}
+
+// ---------------------------------------------------------------------------
+// Notifications (the bell in the top bar)
+// ---------------------------------------------------------------------------
+/** Send the same notification to one or more accounts */
+function notify(array $userIds, string $text, string $code = '', string $icon = 'bell'): void
+{
+    $userIds = array_values(array_unique(array_map('intval', $userIds)));
+    if (!$userIds) {
+        return;
+    }
+    db_update('notifications', function (array $list) use ($userIds, $text, $code, $icon) {
+        $max = 0;
+        foreach ($list as $n) {
+            $max = max($max, (int)$n['id']);
+        }
+        foreach ($userIds as $uid) {
+            $list[] = ['id' => ++$max, 'user_id' => $uid, 'text' => $text, 'code' => $code, 'icon' => $icon,
+                       'created' => date('Y-m-d H:i:s'), 'read' => false];
+        }
+        return count($list) > 500 ? array_slice($list, -500) : $list;   // keep the file small
+    });
+}
+
+function admin_ids(): array
+{
+    return array_values(array_map(fn($u) => (int)$u['id'],
+        array_filter(users_all(), fn($u) => $u['role'] === 'Administrator' && !empty($u['active']))));
+}
+
+/** Active maintenance staff who may work on this report (same department as the concern) */
+function staff_ids_for(array $report): array
+{
+    return array_values(array_map(fn($u) => (int)$u['id'],
+        array_filter(staff_accounts(), fn($u) => !empty($u['active']) && staff_can_handle($u, $report))));
+}
+
+function person_name(?int $uid): string
+{
+    $u = $uid ? user_find($uid) : null;
+    return $u ? rtrim(full_name($u), '.') : 'Someone';
+}
+
+function time_ago(string $datetime): string
+{
+    $t = strtotime($datetime);
+    $d = time() - $t;
+    if ($d < 60)    return 'Just now';
+    if ($d < 3600)  return floor($d / 60) . ' min ago';
+    if ($d < 86400) return floor($d / 3600) . ' h ago';
+    if ($d < 604800) return floor($d / 86400) . ' d ago';
+    return date('M j, Y', $t);
+}
+
+/** Newest first */
+function notifications_for(int $uid, int $limit = 15): array
+{
+    $mine = array_values(array_filter(db_read('notifications'), fn($n) => (int)$n['user_id'] === $uid));
+    usort($mine, fn($a, $b) => (int)$b['id'] <=> (int)$a['id']);
+    return array_slice($mine, 0, $limit);
+}
+
+function unread_count(int $uid): int
+{
+    return count(array_filter(db_read('notifications'), fn($n) => (int)$n['user_id'] === $uid && empty($n['read'])));
+}
+
+/** Mark one notification (or all, when $id is null) as read. Returns the notification's report code. */
+function notifications_mark(int $uid, ?int $id = null): string
+{
+    $code = '';
+    db_update('notifications', function (array $list) use ($uid, $id, &$code) {
+        foreach ($list as &$n) {
+            if ((int)$n['user_id'] === $uid && ($id === null || (int)$n['id'] === $id)) {
+                $n['read'] = true;
+                if ($id !== null) {
+                    $code = (string)($n['code'] ?? '');
+                }
+            }
+        }
+        unset($n);
+        return $list;
+    });
+    return $code;
 }
 
 /** All maintenance staff accounts, sorted by name */
@@ -515,7 +610,8 @@ function assign_state(array $r): string
 function report_workflow(string $code, string $action, int $uid, bool $admin, ?string &$error = null, array $proof = [], string $remarks = ''): ?string
 {
     $msg = null;
-    db_update('reports', function (array $reports) use ($code, $action, $uid, $admin, $proof, $remarks, &$msg, &$error) {
+    $alerts = [];      // [recipients, text, icon], sent after the data is saved
+    db_update('reports', function (array $reports) use ($code, $action, $uid, $admin, $proof, $remarks, &$msg, &$error, &$alerts) {
         foreach ($reports as &$r) {
             if ($r['code'] !== $code) {
                 continue;
@@ -534,6 +630,7 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
                 } else {
                     $r['request_from'] = $uid;
                     $msg = 'Request sent for ' . $code . '. It becomes yours once the admin approves it.';
+                    $alerts[] = [admin_ids(), person_name($uid) . ' asked to take ' . $code . ' (' . $r['type'] . ').', 'hand-index'];
                 }
 
             } elseif ($action === 'cancel_request' && !$admin && $req === $uid) {
@@ -553,14 +650,20 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
                     $r['request_from'] = null;
                     if ($r['status'] === 'Under Review') {
                         $r['status'] = 'In Progress';
+                        $alerts[] = [$r['reporters'] ?? [], 'Your report ' . $code . ' (' . $r['type'] . ' at ' . $r['location'] . ') is now In Progress. '
+                                     . rtrim(full_name($person), '.') . ' is working on it.', 'tools'];
                     }
                     $msg = 'Request approved. ' . $code . ' is now assigned to ' . rtrim(full_name($person), '.') . '.';
+                    $alerts[] = [[(int)$person['id']], 'Your request was approved. ' . $code . ' (' . $r['type'] . ' at ' . $r['location'] . ') is now assigned to you.', 'check-circle'];
                 }
 
             } elseif ($action === 'reject_request' && $admin && $req !== null) {
                 $person = user_find((int)$req);
                 $r['request_from'] = null;
                 $msg = 'Request from ' . ($person ? full_name($person) : 'the staff member') . ' for ' . $code . ' was rejected.';
+                if ($person) {
+                    $alerts[] = [[(int)$person['id']], 'Your request to take ' . $code . ' was not approved.', 'x-circle'];
+                }
 
             } elseif ($action === 'request_resolve' && !$admin && $assigned === $uid && $state === 'accepted'
                       && $open && empty($r['resolve_request'])) {
@@ -572,6 +675,7 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
                     $r['resolve_request'] = ['by' => $uid, 'date' => date('Y-m-d'), 'files' => $proof, 'remarks' => $remarks];
                     $r['sent_back']       = null;
                     $msg = $code . ' was marked as resolved. Waiting for the admin to confirm.';
+                    $alerts[] = [admin_ids(), person_name($uid) . ' submitted the finished work for ' . $code . '. Please review and confirm.', 'clipboard-check'];
                 }
 
             } elseif ($action === 'confirm_resolved' && $admin && !empty($r['resolve_request'])) {
@@ -579,19 +683,30 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
                 $r['resolved_at']     = date('Y-m-d');
                 $r['proof']           = $r['resolve_request']['files'] ?? [];   // keep the proof of work
                 $r['remarks']         = $r['resolve_request']['remarks'] ?? '';
+                $byStaff              = (int)($r['resolve_request']['by'] ?? 0);
                 $r['resolve_request'] = null;
                 $msg = $code . ' was confirmed as resolved.';
+                $alerts[] = [$r['reporters'] ?? [], 'Good news! Your report ' . $code . ' (' . $r['type'] . ' at ' . $r['location'] . ') has been resolved.', 'check2-circle'];
+                if ($byStaff) {
+                    $alerts[] = [[$byStaff], 'The admin confirmed ' . $code . ' as resolved. Thank you!', 'check2-circle'];
+                }
 
             } elseif ($action === 'reject_resolved' && $admin && !empty($r['resolve_request'])) {
                 $by = user_find((int)$r['resolve_request']['by']);
                 $r['resolve_request'] = null;
                 $r['sent_back']       = date('Y-m-d');
+                if ($by) {
+                    $alerts[] = [[(int)$by['id']], $code . ' was sent back by the admin. Please check the work and submit it again.', 'arrow-counterclockwise'];
+                }
                 $msg = $code . ' was sent back to ' . ($by ? full_name($by) : 'the staff member') . '. It stays In Progress.';
             }
         }
         unset($r);
         return $reports;
     });
+    foreach ($alerts as [$to, $text, $icon]) {
+        notify($to, $text, $code, $icon);
+    }
     return $msg;
 }
 

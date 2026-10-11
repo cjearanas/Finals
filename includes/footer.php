@@ -126,6 +126,52 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js"></script>
 
 <script>
+// Notification bell: refreshes every 15 seconds
+(function () {
+  var badge = document.getElementById('notifBadge'), list = document.getElementById('notifList');
+  if (!badge || !list) return;
+  var CSRF = <?= json_encode(csrf_token()) ?>;
+
+  function esc(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+  function draw(data) {
+    var n = data.unread || 0;
+    badge.hidden = n === 0;
+    badge.textContent = n > 99 ? '99+' : n;
+    if (!data.items.length) {
+      list.innerHTML = '<div class="text-center text-body-secondary small py-4"><i class="bi bi-bell-slash fs-4 d-block mb-1"></i>No notifications yet</div>';
+      return;
+    }
+    list.innerHTML = data.items.map(function (it) {
+      return '<a href="notifications.php?go=' + it.id + '" class="d-flex gap-2 px-3 py-2 text-decoration-none border-bottom ' +
+             (it.read ? 'text-body' : 'bg-primary-subtle text-body fw-semibold') + '">' +
+             '<i class="bi bi-' + esc(it.icon) + ' fs-5 text-primary flex-shrink-0"></i>' +
+             '<span class="flex-grow-1"><span class="d-block small">' + esc(it.text) + '</span>' +
+             '<span class="text-body-secondary fw-normal" style="font-size:.72rem">' + esc(it.time) + '</span></span>' +
+             (it.read ? '' : '<span class="rounded-circle bg-primary flex-shrink-0 mt-1" style="width:8px;height:8px"></span>') + '</a>';
+    }).join('');
+  }
+
+  function load() {
+    fetch('notifications.php?json=1', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) draw(d); })
+      .catch(function () {});
+  }
+
+  document.getElementById('notifReadAll').addEventListener('click', function () {
+    var fd = new FormData();
+    fd.append('csrf', CSRF); fd.append('action', 'read_all');
+    fetch('notifications.php', { method: 'POST', body: fd, credentials: 'same-origin' }).then(load);
+  });
+  document.getElementById('notifBtn').addEventListener('show.bs.dropdown', load);
+
+  load();
+  setInterval(function () { if (!document.hidden) load(); }, 15000);
+})();
+</script>
+
+<script>
 // Shared "Are you sure?" popup. Returns a Promise that resolves true (confirmed) or false.
 //   fxConfirm({ title, text, yes, no, icon })
 // Any <form data-confirm="Message?"> is confirmed automatically before it submits
@@ -417,7 +463,7 @@ document.addEventListener('submit', function (e) {
 
     if (changed && sel.value !== '') {                       // picked a staff member
       saveBtn.hidden = false;
-      saveBtn.textContent = currentD.status === 'Under Review' ? 'Assign' : 'Save assignment';
+      saveBtn.textContent = currentD.status === 'Under Review' ? 'Assign & start work' : 'Save assignment';
       $('rm-status-input').value = currentD.status;
     } else if (changed) {                                    // chose "Unassigned"
       saveBtn.hidden = false;

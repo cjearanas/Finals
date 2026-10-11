@@ -1,0 +1,20 @@
+[
+    {
+        "id": 1,
+        "user_id": 2,
+        "text": "Your report RPT-001 (Computer \/ Network at Computer Laboratory 7, 3rd Floor, New Academic Building) is now In Progress. Maintenance, Staff L is working on it.",
+        "code": "RPT-001",
+        "icon": "tools",
+        "created": "2026-10-11 16:52:07",
+        "read": true
+    },
+    {
+        "id": 2,
+        "user_id": 3,
+        "text": "RPT-001 was assigned to you: Computer \/ Network at Computer Laboratory 7, 3rd Floor, New Academic Building.",
+        "code": "RPT-001",
+        "icon": "person-check",
+        "created": "2026-10-11 16:52:07",
+        "read": true
+    }
+]

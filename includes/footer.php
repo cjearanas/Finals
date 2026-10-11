@@ -13,11 +13,6 @@
   </div>
 </div>
 
-<!-- Help Button -->
-<button class="btn btn-light border shadow-sm rounded-circle position-fixed bottom-0 end-0 m-3 p-2 lh-1" aria-label="Help">
-  <i class="bi bi-question-lg"></i>
-</button>
-
 <!-- ================= REPORT DETAILS MODAL ================= -->
 <style>
   .modal-backdrop.show { opacity: .45; backdrop-filter: blur(5px); }
@@ -103,11 +98,11 @@
             <input type="hidden" name="code" id="rm-code-input">
 
             <?php if (is_admin()): ?>
-              <label for="rm-assign-select" class="small fw-semibold mb-1">Assign to maintenance staff</label>
+              <label for="rm-assign-select" class="small fw-semibold mb-1">Assign to maintenance staff <span id="rm-dept" class="text-body-secondary fw-normal"></span></label>
               <select name="assigned_to" id="rm-assign-select" class="form-select form-select-sm mb-2" data-max="<?= MAX_ACTIVE_JOBS ?>">
                 <option value="">Unassigned</option>
                 <?php $allReports = db_read('reports'); foreach (staff_accounts() as $st): $jobs = active_jobs((int)$st['id'], $allReports); ?>
-                  <option value="<?= (int)$st['id'] ?>" data-jobs="<?= $jobs ?>" data-active="<?= $st['active'] ? 1 : 0 ?>" <?= $st['active'] ? '' : 'disabled' ?>>
+                  <option value="<?= (int)$st['id'] ?>" data-jobs="<?= $jobs ?>" data-dept="<?= e($st['department'] ?? '') ?>" data-active="<?= $st['active'] ? 1 : 0 ?>" <?= $st['active'] ? '' : 'disabled' ?>>
                     <?= e(full_name($st)) ?> (<?= $jobs ?>/<?= MAX_ACTIVE_JOBS ?> jobs<?= $jobs >= MAX_ACTIVE_JOBS ? ', full' : '' ?>)<?= $st['active'] ? '' : ' (disabled)' ?>
                   </option>
                 <?php endforeach; ?>
@@ -270,9 +265,12 @@ document.addEventListener('submit', function (e) {
         Array.prototype.forEach.call(as.options, function (o) {
           if (!o.value) return;
           var full = parseInt(o.dataset.jobs, 10) >= max && Number(o.value) !== d.assignedId;
-          o.disabled = o.dataset.active !== '1' || full;
+          var wrongDept = o.dataset.dept !== d.dept;               // ICTC handles technology, GSO the rest
+          o.hidden = wrongDept && Number(o.value) !== d.assignedId;
+          o.disabled = o.dataset.active !== '1' || full || wrongDept;
         });
         as.value = d.assignedId ? String(d.assignedId) : '';
+        if ($('rm-dept')) $('rm-dept').textContent = '(' + d.dept + ' staff only)';
       }
       refreshSave();
     }
@@ -404,8 +402,7 @@ document.addEventListener('submit', function (e) {
 
   // One button: it moves the report to the next status (Under Review > In Progress > Resolved).
   // When a different staff member is picked, the button becomes "Save assignment" instead.
-  var NEXT = { 'Under Review': 'In Progress' };   // Resolved is reached only when staff submit the work and the admin confirms
-  var saveBtn = $('rm-save');
+    var saveBtn = $('rm-save');
 
   function assignChanged() {
     var sel = $('rm-assign-select');
@@ -413,26 +410,34 @@ document.addEventListener('submit', function (e) {
   }
   function refreshSave() {
     if (!saveBtn || !currentD) return;
-    var next = NEXT[currentD.status];
-    if (assignChanged()) {
-      saveBtn.hidden = false;
-      saveBtn.textContent = 'Save assignment';
-      $('rm-status-input').value = currentD.status;
-    } else if (next) {
-      saveBtn.hidden = false;
-      saveBtn.textContent = next === 'Resolved' ? 'Mark as Resolved' : 'Move to In Progress';
-      $('rm-status-input').value = next;
-    } else {
-      saveBtn.hidden = true;                                // nothing to save
-    }
+    var sel = $('rm-assign-select');
     var note = $('rm-wait-note');
-    if (note) {
-      note.hidden = !(currentD.status === 'In Progress' && !assignChanged());
-      note.textContent = currentD.resolvePending
-        ? 'The maintenance staff submitted the work. Use "Confirm resolved" above to review it.'
-        : (currentD.assignedId ? 'Waiting for the maintenance staff to submit the finished work. You can confirm it once they do.'
-                                : 'Assign this task to a maintenance staff member. They will submit the work for your confirmation.');
+    var text = '';
+    var changed = assignChanged();
+
+    if (changed && sel.value !== '') {                       // picked a staff member
+      saveBtn.hidden = false;
+      saveBtn.textContent = currentD.status === 'Under Review' ? 'Assign' : 'Save assignment';
+      $('rm-status-input').value = currentD.status;
+    } else if (changed) {                                    // chose "Unassigned"
+      saveBtn.hidden = false;
+      saveBtn.textContent = 'Remove assignment';
+      $('rm-status-input').value = 'Under Review';           // no one assigned, so it goes back to review
+    } else {
+      saveBtn.hidden = true;                                 // starting work needs a staff member, resolving needs the staff's submission
+      if (currentD.status === 'Under Review') {
+        var eligible = 0;
+        if (sel) Array.prototype.forEach.call(sel.options, function (o) { if (o.value && !o.disabled) eligible++; });
+        text = eligible
+          ? 'Choose a maintenance staff member above. The task moves to In Progress once it is assigned.'
+          : 'No available ' + currentD.dept + ' staff right now. Add or enable one under Maintenance Staff, or wait until someone has room for another job.';
+      } else if (currentD.status === 'In Progress') {
+        text = currentD.resolvePending
+          ? 'The maintenance staff submitted the work. Use "Confirm resolved" above to review it.'
+          : 'Waiting for the maintenance staff to submit the finished work. You can confirm it once they do.';
+      }
     }
+    if (note) { note.textContent = text; note.hidden = text === ''; }
   }
   if ($('rm-assign-select')) $('rm-assign-select').addEventListener('change', refreshSave);
 
@@ -447,8 +452,8 @@ document.addEventListener('submit', function (e) {
           : 'Assign ' + currentD.code + ' to ' + sel.options[sel.selectedIndex].text.trim() + '? The task goes to them right away and is set to In Progress.';
         yes = 'Yes, save it';
       } else {
-        msg = 'Move ' + currentD.code + ' to In Progress?';
-        yes = 'Yes, move it';
+        msg = 'Save the change to ' + currentD.code + '?';
+        yes = 'Yes, save it';
       }
       ask(msg, function () { form.submit(); }, yes);
     });

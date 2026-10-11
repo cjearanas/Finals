@@ -58,23 +58,7 @@ function db_default(string $name): array
                       'password_hash' => password_hash('staff123', PASSWORD_DEFAULT)],
         ];
     }
-    if ($name === 'reports') {
-        return [
-            ['code' => 'RPT-003', 'type' => 'Air Conditioning', 'item' => 'Air Conditioner Unit',
-             'building' => 'New Academic Building', 'floor' => '3rd Floor', 'room' => 'Room 302',
-             'location' => 'Room 302, 3rd Floor, New Academic Building', 'status' => 'In Progress',
-             'date' => '2026-09-28', 'filed' => '2026-09-28', 'count' => 1, 'files' => [], 'reporters' => [2],
-             'assigned_to' => 3, 'assign_state' => 'accepted'],
-            ['code' => 'RPT-002', 'type' => 'Leaking Pipe', 'item' => 'Faucet',
-             'building' => 'College Building', 'floor' => '1st Floor', 'room' => 'Comfort Room',
-             'location' => 'Comfort Room, 1st Floor, College Building', 'status' => 'Under Review',
-             'date' => '2026-09-25', 'filed' => '2026-09-25', 'count' => 1, 'files' => [], 'reporters' => [3]],
-            ['code' => 'RPT-001', 'type' => 'Broken Window', 'item' => 'Window Glass',
-             'building' => 'Junior High School', 'floor' => '1st Floor', 'room' => 'Room 101',
-             'location' => 'Room 101, 1st Floor, Junior High School', 'status' => 'Resolved',
-             'date' => '2026-09-20', 'filed' => '2026-09-20', 'count' => 1, 'files' => [], 'reporters' => [2]],
-        ];
-    }
+    // No sample reports: the list starts empty and fills up as people file reports
     return [];
 }
 
@@ -277,6 +261,18 @@ function concern_items(): array
  * A comfort room has plumbing but no air conditioning; other rooms have no plumbing;
  * computer laboratories also get the Computer / Network concern.
  */
+/** Which maintenance department handles a concern: technology goes to ICTC, everything else to GSO */
+function concern_department(string $type): string
+{
+    return $type === 'Computer / Network' ? 'ICTC' : 'GSO';
+}
+
+/** Can this maintenance staff account work on this report? (department must match the concern) */
+function staff_can_handle(?array $user, array $report): bool
+{
+    return $user && ($user['department'] ?? '') === concern_department((string)($report['type'] ?? ''));
+}
+
 function room_concerns(string $room): array
 {
     if (stripos($room, 'Comfort Room') !== false) {
@@ -302,7 +298,7 @@ function get_reports(?string $status = null, ?string $view = null): array
             in_array($me['id'], $r['reporters'] ?? [], true)
             || ($r['assigned_to'] ?? null) === $me['id']
             || ($r['request_from'] ?? null) === $me['id']
-            || (is_staff() && empty($r['assigned_to']) && ($r['status'] ?? '') !== 'Resolved')   // open tasks anyone on staff can take
+            || (is_staff() && empty($r['assigned_to']) && ($r['status'] ?? '') !== 'Resolved' && staff_can_handle($me, $r))   // open tasks for their department
         )));
     }
     // Staff shortcuts: only the tasks assigned to the logged-in account
@@ -530,7 +526,9 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
             $open     = ($r['status'] ?? '') !== 'Resolved';
 
             if ($action === 'take' && !$admin && $assigned === null && $req === null && $open) {
-                if (active_jobs($uid, $reports) + pending_requests($uid, $reports) >= MAX_ACTIVE_JOBS) {
+                if (!staff_can_handle(user_find($uid), $r)) {
+                    $error = 'This task belongs to ' . concern_department($r['type']) . ', so only ' . concern_department($r['type']) . ' staff can take it.';
+                } elseif (active_jobs($uid, $reports) + pending_requests($uid, $reports) >= MAX_ACTIVE_JOBS) {
                     $error = 'You can only have ' . MAX_ACTIVE_JOBS . ' jobs at a time (counting tasks you asked for). '
                            . 'Resolve one of your jobs before taking another.';
                 } else {
@@ -544,7 +542,9 @@ function report_workflow(string $code, string $action, int $uid, bool $admin, ?s
 
             } elseif ($action === 'approve_request' && $admin && $req !== null && $assigned === null) {
                 $person = user_find((int)$req);
-                if ($person && active_jobs((int)$req, $reports) >= MAX_ACTIVE_JOBS) {
+                if ($person && !staff_can_handle($person, $r)) {
+                    $error = full_name($person) . ' is not in ' . concern_department($r['type']) . ', so they cannot handle this task.';
+                } elseif ($person && active_jobs((int)$req, $reports) >= MAX_ACTIVE_JOBS) {
                     $error = full_name($person) . ' already has ' . MAX_ACTIVE_JOBS . ' unresolved jobs and cannot take another one.';
                 } elseif ($person && $person['active'] && in_array($person['role'], ROLES_STAFF, true)) {
                     $r['assigned_to']  = (int)$req;
@@ -729,8 +729,9 @@ function render_report(array $r, ?string $borderClass = null): void
         'hasRequest'    => (bool)$reqId,
         'requestName'   => $admin ? ($reqUser ? full_name($reqUser) : 'A staff member') : ($reqByMe ? 'You' : ''),
         'requestedByMe' => (bool)$reqByMe,
-        'canTake'       => $staff && $open && empty($r['assigned_to']) && !$reqId && my_job_load() < MAX_ACTIVE_JOBS,
-        'atLimit'       => $staff && $open && empty($r['assigned_to']) && !$reqId && my_job_load() >= MAX_ACTIVE_JOBS,
+        'canTake'       => $staff && $open && empty($r['assigned_to']) && !$reqId && staff_can_handle($me, $r) && my_job_load() < MAX_ACTIVE_JOBS,
+        'atLimit'       => $staff && $open && empty($r['assigned_to']) && !$reqId && staff_can_handle($me, $r) && my_job_load() >= MAX_ACTIVE_JOBS,
+        'dept'          => concern_department((string)$r['type']),
         'maxJobs'       => MAX_ACTIVE_JOBS,
         'resolvePending' => (bool)$rr,
         'proof'         => $rr['files'] ?? ($r['proof'] ?? []),

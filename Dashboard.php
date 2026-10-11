@@ -68,7 +68,7 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
 
     <div class="col-md-4">
       <div class="h-100 bg-secondary text-white rounded p-3 fw-semibold d-flex align-items-center justify-content-center">
-        Active Tasks: <?= count_active_tasks() ?>
+        Active Jobs: <?= count_active_tasks() ?> / <?= MAX_ACTIVE_JOBS ?>
       </div>
     </div>
 
@@ -84,14 +84,6 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
         <span class="position-absolute top-0 end-0 m-2 small"><?= count_available_tasks() ?></span>
         <i class="bi bi-person-plus fs-1"></i>
         Available Tasks
-      </a>
-    </div>
-
-    <div class="col-md-4">
-      <a href="maintenance-log.php?view=awaiting" class="<?= $boxBase ?> text-bg-warning">
-        <span class="position-absolute top-0 end-0 m-2 small"><?= count_awaiting_acceptance() ?></span>
-        <i class="bi bi-bell fs-1"></i>
-        Awaiting Acceptance
       </a>
     </div>
 

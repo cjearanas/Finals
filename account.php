@@ -129,11 +129,10 @@ $initials = $currentUser['initials'];
         </form>
 
         <?php if ($u['avatar']): ?>
-          <form method="post" class="mt-1">
+          <form method="post" class="mt-1" data-confirm="Your profile picture will be removed." data-confirm-yes="Yes, remove it">
             <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="action" value="avatar_remove">
-            <button type="submit" class="btn btn-link btn-sm text-white-50 p-0" style="font-size:.75rem"
-                    onclick="return confirm('Remove your profile picture?');">Remove photo</button>
+            <button type="submit" class="btn btn-link btn-sm text-white-50 p-0" style="font-size:.75rem">Remove photo</button>
           </form>
         <?php endif; ?>
       </div>
@@ -243,7 +242,7 @@ $initials = $currentUser['initials'];
 
       <!-- Password -->
       <div class="tab-pane fade <?= $tab === 'password' ? 'show active' : '' ?>" id="tab-password" role="tabpanel">
-        <form method="post" action="account.php" style="max-width:460px" autocomplete="off">
+        <form method="post" action="account.php" style="max-width:460px" autocomplete="off" data-confirm="Your password will be changed." data-confirm-yes="Yes, change it">
           <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
           <input type="hidden" name="action" value="password">
 

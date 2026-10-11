@@ -7,6 +7,7 @@ $cfg  = $type === 'staff'
     ? ['title' => 'Maintenance Staff', 'roles' => ROLES_STAFF]
     : ['title' => 'User',  'roles' => ROLES_USER];
 $selfUrl = 'admin-accounts.php?type=' . $type;
+$departments = $type === 'staff' ? DEPARTMENTS_STAFF : DEPARTMENTS;   // maintenance staff: ICTC or GSO only
 $me      = current_user();
 
 $managed = fn($u) => in_array($u['role'], $cfg['roles'], true);
@@ -65,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = 'Please enter a ' . ($type === 'staff' ? 'Staff ID' : 'User ID') . ' (max 30 characters).';
         }
         $keepsOld = $target && $target['department'] === $f['department'];     // an older department can stay as it is
-        if (!in_array($f['department'], DEPARTMENTS, true) && !$keepsOld) {
+        if (!in_array($f['department'], $departments, true) && !$keepsOld) {
             $errors[] = 'Please select a department.';
         }
         if (!preg_match('/^[0-9xX+\-\s()]{0,20}$/', $f['contact'])) {
@@ -157,7 +158,7 @@ require __DIR__ . '/includes/header.php';
     <table class="table table-hover align-middle mb-0" id="acctTable">
       <thead class="table-light">
         <tr>
-          <th>ID</th><th>Name</th><th>Email</th><th>Department</th><th>Role</th><th>Status</th><th class="text-end">Actions</th>
+          <th>ID</th><th>Name</th><th>Email</th><th>Department</th><th>Role</th><?= $type === 'staff' ? '<th>Jobs</th>' : '' ?><th>Status</th><th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -168,6 +169,9 @@ require __DIR__ . '/includes/header.php';
             <td><?= e($a['email']) ?></td>
             <td><?= e($a['department']) ?></td>
             <td><?= e($a['role']) ?></td>
+            <?php if ($type === 'staff'): $jobs = active_jobs((int)$a['id']); ?>
+              <td><span class="badge text-bg-<?= $jobs >= MAX_ACTIVE_JOBS ? 'danger' : 'secondary' ?>"><?= $jobs ?>/<?= MAX_ACTIVE_JOBS ?></span></td>
+            <?php endif; ?>
             <td>
               <span class="badge text-bg-<?= $a['active'] ? 'success' : 'secondary' ?>"><?= $a['active'] ? 'Active' : 'Disabled' ?></span>
             </td>
@@ -177,7 +181,8 @@ require __DIR__ . '/includes/header.php';
                 <i class="bi bi-pencil-square"></i> Edit
               </button>
               <form method="post" action="<?= e($selfUrl) ?>" class="d-inline"
-                    onsubmit="return confirm('<?= $a['active'] ? 'Disable' : 'Enable' ?> this account?');">
+                    data-confirm="<?= $a['active'] ? 'This account will not be able to log in until it is enabled again.' : 'This account will be able to log in again.' ?>"
+                    data-confirm-yes="<?= $a['active'] ? 'Yes, disable it' : 'Yes, enable it' ?>">
                 <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
                 <input type="hidden" name="action" value="toggle">
                 <input type="hidden" name="type" value="<?= e($type) ?>">
@@ -190,7 +195,7 @@ require __DIR__ . '/includes/header.php';
           </tr>
         <?php endforeach; ?>
         <tr id="acctEmpty" <?= $accounts ? 'hidden' : '' ?>>
-          <td colspan="7" class="text-center text-body-secondary py-4">
+          <td colspan="<?= $type === 'staff' ? 8 : 7 ?>" class="text-center text-body-secondary py-4">
             <?= $accounts ? 'No accounts match your search.' : 'No accounts yet.' ?>
           </td>
         </tr>
@@ -230,7 +235,7 @@ require __DIR__ . '/includes/header.php';
           <div class="col-md-4"><label class="form-label small fw-semibold" for="f-department">Department</label>
             <select class="form-select" id="f-department" name="department" required>
               <option value="" disabled selected>Select</option>
-              <?php foreach (DEPARTMENTS as $d): ?><option><?= e($d) ?></option><?php endforeach; ?>
+              <?php foreach ($departments as $d): ?><option><?= e($d) ?></option><?php endforeach; ?>
             </select></div>
           <div class="col-md-4"><label class="form-label small fw-semibold" for="f-contact">Contact number</label>
             <input class="form-control" id="f-contact" name="contact" maxlength="20"></div>
@@ -240,7 +245,12 @@ require __DIR__ . '/includes/header.php';
             </select></div>
 
           <div class="col-12"><label class="form-label small fw-semibold" for="f-password" id="f-password-label">Password</label>
-            <input type="text" class="form-control" id="f-password" name="password" autocomplete="new-password">
+            <div class="input-group">
+              <input type="password" class="form-control" id="f-password" name="password" autocomplete="new-password">
+              <button type="button" class="btn btn-outline-secondary" id="f-password-toggle" aria-label="Show or hide password">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
             <div class="form-text">At least 8 characters, with a letter and a number. Share it with the person securely.</div></div>
         </div>
       </div>
@@ -261,6 +271,14 @@ document.addEventListener('DOMContentLoaded', function () {
   var $ = function (id) { return document.getElementById(id); };
   var fields = ['last_name', 'first_name', 'mi', 'email', 'school_id', 'department', 'contact', 'role'];
 
+  function setPasswordVisible(show) {
+    $('f-password').type = show ? 'text' : 'password';
+    $('f-password-toggle').firstElementChild.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
+  }
+  $('f-password-toggle').addEventListener('click', function () {
+    setPasswordVisible($('f-password').type === 'password');
+  });
+
   function fill(a) {
     var editing = a && a.id > 0;
     $('accountModalTitle').textContent = editing ? 'Edit account' : 'Add account';
@@ -278,6 +296,7 @@ document.addEventListener('DOMContentLoaded', function () {
       el.value = a && a[k] !== undefined ? a[k] : (k === 'role' ? el.options[0].value : '');
     });
     $('f-password').value = '';
+    setPasswordVisible(false);
     $('f-password').required = !editing;
     $('f-password-label').textContent = editing ? 'New password (leave blank to keep the current one)' : 'Password';
   }

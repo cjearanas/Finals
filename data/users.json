@@ -38,7 +38,63 @@
         "mi": "L",
         "email": "mstaff@pcu.edu.ph",
         "school_id": "STF-001",
-        "department": "Maintenance",
-        "password_hash": "$2y$10$XQE8szJmVL4ue6D0jgBDBO0SW6SBhe8ets6DiAiAdEKvuZg0iMgMK"
+        "department": "ICTC",
+        "password_hash": "$2y$10$ZzYq\/1f\/OY8jB8mSbYz0NuWN3B\/BSXceyufbFGRoPGR4VdM40b52m"
+    },
+    {
+        "id": 4,
+        "last_name": "user2",
+        "first_name": "user2",
+        "mi": "U",
+        "email": "user2@pcu.edu.ph",
+        "school_id": "2026-002",
+        "department": "COI",
+        "contact": "09556644220",
+        "role": "Student",
+        "avatar": null,
+        "active": true,
+        "password_hash": "$2y$10$BsuO64Uys4clO0Cj.dNqReeo2dT1DuS22qmznfsD3Mlx7HFfvggRW"
+    },
+    {
+        "id": 5,
+        "last_name": "user3",
+        "first_name": "user3",
+        "mi": "U",
+        "email": "user3@pcu.edu.ph",
+        "school_id": "Fty-001",
+        "department": "CET",
+        "contact": "09665841223",
+        "role": "Faculty",
+        "avatar": null,
+        "active": true,
+        "password_hash": "$2y$10$IIjH7WC3ePIApy2tL3CgdOzbXgc4FuZp1vq4efZ4f0GULgwkNdoGi"
+    },
+    {
+        "id": 6,
+        "last_name": "Staff2",
+        "first_name": "Staff2",
+        "mi": "S",
+        "email": "mstaff2@pcu.edu.ph",
+        "school_id": "STF-002",
+        "department": "GSO",
+        "contact": "09512266435",
+        "role": "Staff",
+        "avatar": null,
+        "active": true,
+        "password_hash": "$2y$10$j8jjfBnM098QyS7L1sTaqeoivhehOPDKY\/GzLLBT00N62t\/X41ZTW"
+    },
+    {
+        "id": 7,
+        "last_name": "staff3",
+        "first_name": "staff3",
+        "mi": "S",
+        "email": "staff3@pcu.edu.ph",
+        "school_id": "STF-003",
+        "department": "ICTC",
+        "contact": "09465591235",
+        "role": "Staff",
+        "avatar": null,
+        "active": true,
+        "password_hash": "$2y$10$Y4mAZXgf3CwMhOlYKhts8OsnJbBqLKeRB5\/iANGk\/mj9FDLU6ZY1S"
     }
 ]

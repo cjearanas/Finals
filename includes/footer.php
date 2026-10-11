@@ -66,6 +66,8 @@
           <dt>Location</dt><dd id="rm-location"></dd>
           <dt>Date Filed</dt><dd id="rm-filed"></dd>
           <dt>Status</dt><dd><span id="rm-status" class="rm-pill"></span></dd>
+          <div id="rm-proof-view" class="mt-1" hidden><dt>Proof of work</dt><dd id="rm-proof-links" class="fw-normal d-flex flex-wrap gap-2"></dd></div>
+          <div id="rm-remarks-view" class="mt-1" hidden><dt>Remarks</dt><dd id="rm-remarks-text" class="fw-normal" style="white-space:pre-line"></dd></div>
           <div id="rm-count-wrap" class="mt-1"><dt>Number of Reports</dt><dd id="rm-count"></dd></div>
           <div id="rm-desc-wrap" class="mt-1"><dt>Description</dt><dd id="rm-desc" class="fw-normal"></dd></div>
           <div id="rm-assigned-wrap" class="mt-1" hidden><dt>Assigned to</dt><dd id="rm-assigned" class="fw-normal"></dd></div>
@@ -73,12 +75,21 @@
         </dl>
 
         <?php if (is_admin() || is_staff()): ?>
-          <!-- Task workflow: accept / decline / take / approve -->
+          <!-- Task workflow: take / approve / mark resolved -->
           <div id="rm-workflow" class="mt-3 pt-3 border-top" hidden>
             <div id="rm-wf-text" class="small fw-semibold mb-2"></div>
+            <div id="rm-proof-wrap" class="mb-2" hidden>
+              <label for="rm-remarks" class="small fw-semibold mb-1">Remarks <span class="text-danger">*</span></label>
+              <textarea id="rm-remarks" name="remarks" form="rm-action-form" rows="2" maxlength="1000"
+                        class="form-control form-control-sm mb-2" placeholder="What was done to fix the problem?"></textarea>
+              <label for="rm-proof" class="small fw-semibold mb-1">Photo or video of the finished work <span class="text-danger">*</span></label>
+              <input type="file" id="rm-proof" name="proof[]" form="rm-action-form" class="form-control form-control-sm"
+                     accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple>
+              <div class="form-text">Images or videos only, up to 50MB each.</div>
+            </div>
             <div id="rm-wf-buttons" class="d-flex flex-wrap gap-2"></div>
           </div>
-          <form method="post" action="task-action.php" id="rm-action-form" hidden>
+          <form method="post" action="task-action.php" id="rm-action-form" enctype="multipart/form-data" hidden>
             <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="back" value="<?= e(basename($_SERVER['PHP_SELF'])) ?>">
             <input type="hidden" name="code" id="rm-act-code">
@@ -93,33 +104,22 @@
 
             <?php if (is_admin()): ?>
               <label for="rm-assign-select" class="small fw-semibold mb-1">Assign to maintenance staff</label>
-              <select name="assigned_to" id="rm-assign-select" class="form-select form-select-sm mb-2">
+              <select name="assigned_to" id="rm-assign-select" class="form-select form-select-sm mb-2" data-max="<?= MAX_ACTIVE_JOBS ?>">
                 <option value="">Unassigned</option>
-                <?php foreach (staff_accounts() as $st): ?>
-                  <option value="<?= (int)$st['id'] ?>" <?= $st['active'] ? '' : 'disabled' ?>>
-                    <?= e(full_name($st)) ?><?= $st['active'] ? '' : ' (disabled)' ?>
+                <?php $allReports = db_read('reports'); foreach (staff_accounts() as $st): $jobs = active_jobs((int)$st['id'], $allReports); ?>
+                  <option value="<?= (int)$st['id'] ?>" data-jobs="<?= $jobs ?>" data-active="<?= $st['active'] ? 1 : 0 ?>" <?= $st['active'] ? '' : 'disabled' ?>>
+                    <?= e(full_name($st)) ?> (<?= $jobs ?>/<?= MAX_ACTIVE_JOBS ?> jobs<?= $jobs >= MAX_ACTIVE_JOBS ? ', full' : '' ?>)<?= $st['active'] ? '' : ' (disabled)' ?>
                   </option>
                 <?php endforeach; ?>
               </select>
             <?php endif; ?>
 
-            <label for="rm-status-select" class="small fw-semibold mb-1">Update status</label>
-            <div class="d-flex gap-2">
-              <select name="status" id="rm-status-select" class="form-select form-select-sm">
-                <?php foreach (array_keys(STATUSES) as $label): ?><option><?= e($label) ?></option><?php endforeach; ?>
-              </select>
-              <button type="button" id="rm-save" class="btn btn-sm text-white px-3" style="background:#012a5e">Save</button>
-            </div>
+            <input type="hidden" name="status" id="rm-status-input" value="">
+            <button type="button" id="rm-save" class="btn btn-sm text-white w-100" style="background:#012a5e"></button>
+            <div id="rm-wait-note" class="small text-body-secondary" hidden></div>
           </form>
           <?php endif; ?>
 
-          <div id="rm-confirm" class="alert alert-warning mt-3 mb-0 py-2" role="alert" hidden>
-            <div id="rm-confirm-text" class="small fw-semibold mb-2"></div>
-            <div class="d-flex gap-2">
-              <button type="button" id="rm-confirm-yes" class="btn btn-sm btn-dark">Yes, confirm</button>
-              <button type="button" id="rm-confirm-no" class="btn btn-sm btn-outline-secondary">Cancel</button>
-            </div>
-          </div>
         <?php endif; ?>
       </div>
 
@@ -128,6 +128,42 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js"></script>
+
+<script>
+// Shared "Are you sure?" popup. Returns a Promise that resolves true (confirmed) or false.
+//   fxConfirm({ title, text, yes, no, icon })
+// Any <form data-confirm="Message?"> is confirmed automatically before it submits
+// (optional: data-confirm-title, data-confirm-yes).
+window.fxConfirm = function (o) {
+  o = o || {};
+  if (!window.Swal) return Promise.resolve(window.confirm(o.text || o.title || 'Are you sure?'));
+  return Swal.fire({
+    icon: o.icon || 'warning',
+    title: o.title || 'Are you sure?',
+    text: o.html ? undefined : (o.text || ''),
+    html: o.html || undefined,
+    preConfirm: o.preConfirm || undefined,
+    width: o.width || undefined,
+    showCancelButton: !o.hideCancel,
+    confirmButtonText: o.yes || 'Yes, confirm',
+    cancelButtonText: o.no || 'Cancel',
+    confirmButtonColor: '#3085d6',
+    cancelButtonColor: '#d33',
+    reverseButtons: false,
+    focusCancel: true,
+    target: document.querySelector('.modal.show') || document.body
+  }).then(function (r) { return !!r.isConfirmed; });
+};
+
+document.addEventListener('submit', function (e) {
+  var f = e.target;
+  if (!f || !f.dataset || !f.dataset.confirm || f.dataset.confirmed === '1') return;
+  e.preventDefault();
+  window.fxConfirm({ title: f.dataset.confirmTitle, text: f.dataset.confirm, yes: f.dataset.confirmYes })
+    .then(function (ok) { if (ok) { f.dataset.confirmed = '1'; f.submit(); } });
+}, true);
+</script>
 
 <script>
 (function () {
@@ -214,7 +250,7 @@
       by.textContent = (d.reporters || []).join(', ');
       $('rm-by-wrap').hidden = !(d.reporters && d.reporters.length);
     }
-    $('rm-assigned').textContent = d.assigned + (d.assignState === 'pending' ? ' (awaiting acceptance)' : '');
+    $('rm-assigned').textContent = d.assigned;
     $('rm-assigned-wrap').hidden = !d.assigned;
 
     currentD = d;
@@ -226,10 +262,36 @@
     if (manage) {
       manage.hidden = !d.canUpdate;
       $('rm-code-input').value = d.code;
-      $('rm-status-select').value = d.status;
       var as = $('rm-assign-select');
-      if (as) as.value = d.assignedId ? String(d.assignedId) : '';
+      if (as) {
+        // A staff member who already holds the maximum number of unresolved jobs cannot be picked,
+        // unless this report is already one of theirs.
+        var max = parseInt(as.dataset.max, 10);
+        Array.prototype.forEach.call(as.options, function (o) {
+          if (!o.value) return;
+          var full = parseInt(o.dataset.jobs, 10) >= max && Number(o.value) !== d.assignedId;
+          o.disabled = o.dataset.active !== '1' || full;
+        });
+        as.value = d.assignedId ? String(d.assignedId) : '';
+      }
+      refreshSave();
     }
+
+    // Proof of work (photos/videos of the finished job)
+    var pv = $('rm-proof-view'), pl = $('rm-proof-links');
+    pl.innerHTML = '';
+    (d.proof || []).forEach(function (f) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-sm btn-outline-secondary';
+      b.innerHTML = '<i class="bi bi-' + (f.kind === 'video' ? 'camera-video' : 'image') + '"></i> ';
+      b.appendChild(document.createTextNode(f.name));
+      b.addEventListener('click', function () { showMedia(f); $('rm-media').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
+      pl.appendChild(b);
+    });
+    pv.hidden = !(d.proof && d.proof.length);
+    $('rm-remarks-text').textContent = d.remarks || '';
+    $('rm-remarks-view').hidden = !d.remarks;
 
     showMedia(d.files[0]);
     fillThumbs(d.files);
@@ -242,25 +304,8 @@
   // ----- Confirmation + task workflow (admin / maintenance staff) -----
   var currentD = null, confirmFn = null;
 
-  function ask(message, fn) {
-    var panel = $('rm-confirm');
-    if (!panel) { fn(); return; }
-    $('rm-confirm-text').textContent = message;
-    confirmFn = fn;
-    panel.hidden = false;
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-  if ($('rm-confirm-yes')) {
-    $('rm-confirm-yes').addEventListener('click', function () {
-      var f = confirmFn;
-      $('rm-confirm').hidden = true;
-      confirmFn = null;
-      if (f) f();
-    });
-    $('rm-confirm-no').addEventListener('click', function () {
-      $('rm-confirm').hidden = true;
-      confirmFn = null;
-    });
+  function ask(message, fn, yes) {
+    window.fxConfirm({ text: message, yes: yes }).then(function (ok) { if (ok) fn(); });
   }
 
   function sendAction(action) {
@@ -269,12 +314,46 @@
     $('rm-action-form').submit();
   }
 
-  function wfButton(label, cls, message, action) {
+  // "Mark as resolved" opens one popup that asks for remarks + a photo/video, then confirms.
+  function resolveDialog() {
+    var code = currentD.code;
+    var html =
+      '<p class="small text-body-secondary mb-2">The admin has to confirm it before it is closed.</p>' +
+      '<textarea id="sw-remarks" class="form-control mb-2" rows="3" maxlength="1000" placeholder="Remarks: what was done to fix the problem?"></textarea>' +
+      '<div class="text-start small fw-semibold mb-1">Photo or video of the finished work</div>' +
+      '<input type="file" id="sw-proof" class="form-control" multiple accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime">' +
+      '<div class="text-start form-text">Images or videos only, up to 50MB each.</div>';
+    window.fxConfirm({
+      title: 'Mark ' + code + ' as resolved?',
+      html: html,
+      yes: 'Yes, mark as resolved',
+      preConfirm: function () {
+        var rem = document.getElementById('sw-remarks').value.trim();
+        var fs  = document.getElementById('sw-proof').files, msg = '';
+        if (!rem) msg = 'Please write your remarks about the work done.';
+        else if (!fs.length) msg = 'Please add a photo or video of the finished work.';
+        for (var i = 0; i < fs.length && !msg; i++) {
+          if (!/^(image|video)\//.test(fs[i].type)) msg = '"' + fs[i].name + '" is not an image or video.';
+          else if (fs[i].size > 50 * 1024 * 1024) msg = '"' + fs[i].name + '" is larger than 50MB.';
+        }
+        if (msg) { Swal.showValidationMessage(msg); return false; }
+        $('rm-remarks').value = rem;
+        $('rm-proof').files = fs;                       // hand the chosen files to the real form
+        return true;
+      }
+    }).then(function (ok) { if (ok) sendAction('request_resolve'); });
+  }
+
+  function wfButton(label, cls, message, action, precheck, custom) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn btn-sm ' + cls;
     b.textContent = label;
-    b.addEventListener('click', function () { ask(message, function () { sendAction(action); }); });
+    b.addEventListener('click', function () {
+      if (custom) { custom(); return; }
+      if (precheck && !precheck()) return;
+      ask(message, function () { sendAction(action); });
+    });
     $('rm-wf-buttons').appendChild(b);
   }
 
@@ -283,24 +362,25 @@
     if (!box) return;
     var text = '';
     $('rm-wf-buttons').innerHTML = '';
+    $('rm-proof-wrap').hidden = true;
 
     if (d.viewer === 'staff') {
-      if (d.mine && d.assignState === 'pending') {
-        text = 'The admin assigned this task to you. Please accept or decline it.';
-        wfButton('Accept task', 'btn-success', 'Accept task ' + d.code + '? Its status will change to In Progress.', 'accept');
-        wfButton('Decline', 'btn-outline-danger', 'Decline task ' + d.code + '? It will go back to the admin to assign again.', 'decline');
-      } else if (d.mine && d.assignState === 'accepted' && d.status !== 'Resolved') {
+      if (d.mine && d.status !== 'Resolved') {
         if (d.resolvePending) {
           text = 'You marked this task as resolved. Waiting for the admin to confirm.';
         } else {
           text = d.sentBack
             ? 'The admin sent this task back. Please check it, then mark it as resolved again.'
             : 'Finished the work? Mark it as resolved and the admin will confirm it.';
-          wfButton('Mark as resolved', 'btn-success', 'Mark ' + d.code + ' as resolved? The admin has to confirm it before it is closed.', 'request_resolve');
+          $('rm-proof').value = '';
+          $('rm-remarks').value = '';
+          wfButton('Mark as resolved', 'btn-success', '', 'request_resolve', null, resolveDialog);
         }
       } else if (d.canTake) {
         text = 'This task is open. You can ask to take it, and the admin will confirm.';
         wfButton('Take this task', 'btn-primary', 'Ask to take ' + d.code + '? It only becomes yours after the admin approves it.', 'take');
+      } else if (d.atLimit) {
+        text = 'You already have ' + d.maxJobs + ' unresolved jobs. Resolve one of them before taking another task.';
       } else if (d.requestedByMe) {
         text = 'You asked to take this task. Waiting for the admin to approve.';
         wfButton('Cancel request', 'btn-outline-secondary', 'Cancel your request for ' + d.code + '?', 'cancel_request');
@@ -316,30 +396,61 @@
         text = d.requestName + ' asked to take this task.';
         wfButton('Approve', 'btn-success', 'Approve ' + d.requestName + ' for ' + d.code + '? The task will be assigned to them and set to In Progress.', 'approve_request');
         wfButton('Reject', 'btn-outline-danger', 'Reject the request from ' + d.requestName + ' for ' + d.code + '?', 'reject_request');
-      } else if (d.assignState === 'pending') {
-        text = 'Waiting for ' + d.assigned + ' to accept this task.';
-      } else if (d.declinedNote) {
-        text = d.declinedNote + '. This task is unassigned.';
       }
     }
     box.hidden = text === '';
     $('rm-wf-text').textContent = text;
   }
 
-  // Save: ask for confirmation first when the assignment changes
+  // One button: it moves the report to the next status (Under Review > In Progress > Resolved).
+  // When a different staff member is picked, the button becomes "Save assignment" instead.
+  var NEXT = { 'Under Review': 'In Progress' };   // Resolved is reached only when staff submit the work and the admin confirms
   var saveBtn = $('rm-save');
+
+  function assignChanged() {
+    var sel = $('rm-assign-select');
+    return !!(sel && currentD && sel.value !== String(currentD.assignedId || ''));
+  }
+  function refreshSave() {
+    if (!saveBtn || !currentD) return;
+    var next = NEXT[currentD.status];
+    if (assignChanged()) {
+      saveBtn.hidden = false;
+      saveBtn.textContent = 'Save assignment';
+      $('rm-status-input').value = currentD.status;
+    } else if (next) {
+      saveBtn.hidden = false;
+      saveBtn.textContent = next === 'Resolved' ? 'Mark as Resolved' : 'Move to In Progress';
+      $('rm-status-input').value = next;
+    } else {
+      saveBtn.hidden = true;                                // nothing to save
+    }
+    var note = $('rm-wait-note');
+    if (note) {
+      note.hidden = !(currentD.status === 'In Progress' && !assignChanged());
+      note.textContent = currentD.resolvePending
+        ? 'The maintenance staff submitted the work. Use "Confirm resolved" above to review it.'
+        : (currentD.assignedId ? 'Waiting for the maintenance staff to submit the finished work. You can confirm it once they do.'
+                                : 'Assign this task to a maintenance staff member. They will submit the work for your confirmation.');
+    }
+  }
+  if ($('rm-assign-select')) $('rm-assign-select').addEventListener('change', refreshSave);
+
   if (saveBtn) {
     saveBtn.addEventListener('click', function () {
       var form = $('rm-manage');
       var sel = $('rm-assign-select');
-      if (sel && currentD && sel.value !== String(currentD.assignedId || '')) {
-        var msg = sel.value === ''
+      var msg, yes;
+      if (assignChanged()) {
+        msg = sel.value === ''
           ? 'Remove the current assignment from ' + currentD.code + '?'
-          : 'Assign ' + currentD.code + ' to ' + sel.options[sel.selectedIndex].text.trim() + '? They will be asked to accept the task.';
-        ask(msg, function () { form.submit(); });
+          : 'Assign ' + currentD.code + ' to ' + sel.options[sel.selectedIndex].text.trim() + '? The task goes to them right away and is set to In Progress.';
+        yes = 'Yes, save it';
       } else {
-        form.submit();
+        msg = 'Move ' + currentD.code + ' to In Progress?';
+        yes = 'Yes, move it';
       }
+      ask(msg, function () { form.submit(); }, yes);
     });
   }
 

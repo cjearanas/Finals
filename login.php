@@ -6,36 +6,27 @@ if (current_user()) {
     exit;
 }
 
-// Login type => roles that may use it
-$groups = [
-    'user'  => ['label' => 'User',              'roles' => ROLES_USER,        'idLabel' => 'User ID'],
-    'staff' => ['label' => 'Maintenance Staff', 'roles' => ROLES_STAFF,       'idLabel' => 'Staff ID'],
-    'admin' => ['label' => 'Administrator',     'roles' => ['Administrator'], 'idLabel' => ''],
-];
-
-$tab   = 'user';
 $error = '';
 $email = '';
-$sid   = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $tab   = isset($groups[$_POST['tab'] ?? '']) ? $_POST['tab'] : 'user';
     $email = trim($_POST['email'] ?? '');
-    $sid   = trim($_POST['school_id'] ?? '');
     $pw    = (string)($_POST['password'] ?? '');
-    $g     = $groups[$tab];
 
-    $user = $email !== '' ? user_by_login($email) : null;
-    $ok   = $user
-        && strcasecmp($user['email'], $email) === 0
-        && in_array($user['role'], $g['roles'], true)
-        && ($tab === 'admin' || strcasecmp($user['school_id'], $sid) === 0)
-        && password_verify($pw, $user['password_hash']);
+    // Find the account by email only. Its role (user, maintenance staff or administrator)
+    // decides which dashboard the person gets after logging in.
+    $user = null;
+    foreach (users_all() as $u) {
+        if ($email !== '' && strcasecmp($u['email'], $email) === 0) {
+            $user = $u;
+            break;
+        }
+    }
 
     if (!csrf_valid($_POST['csrf'] ?? null)) {
         $error = 'Your session expired. Please try again.';
-    } elseif (!$ok) {
-        $error = 'No matching ' . strtolower($g['label']) . ' account. Check your details or contact the administrator.';
+    } elseif (!$user || !password_verify($pw, $user['password_hash'])) {
+        $error = 'Incorrect email or password.';
     } elseif (!$user['active']) {
         $error = 'This account is disabled. Please contact the administrator.';
     } else {
@@ -58,12 +49,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     body { font-family: 'Poppins', sans-serif; background: linear-gradient(135deg, #0d2b5e, #1c4aa0); min-height: 100vh; }
     .login-card { max-width: 440px; border: 0; border-radius: 20px; }
-
-    /* Segmented role switch */
-    .role-switch { display: flex; gap: 4px; padding: 5px; background: #eef1f9; border-radius: 14px; }
-    .role-switch button { flex: 1; border: 0; background: transparent; color: #6b7a99; font-weight: 600; font-size: .85rem;
-                          padding: .7rem .4rem; border-radius: 10px; transition: background .15s, color .15s; }
-    .role-switch button.active { background: #fff; color: #012a5e; box-shadow: 0 2px 6px rgba(1,42,94,.18); }
 
     /* Error banner */
     .login-error { background: #fbe6e6; color: #7a1010; border-left: 5px solid #a31515; border-radius: 10px; padding: .8rem 1rem; font-size: .92rem; }
@@ -95,13 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <hr class="opacity-10 mb-3">
 
-      <!-- Role switch -->
-      <div class="role-switch mb-3" role="tablist">
-        <?php foreach ($groups as $key => $g): ?>
-          <button type="button" data-tab="<?= e($key) ?>" class="<?= $key === $tab ? 'active' : '' ?>"><?= e($g['label']) ?></button>
-        <?php endforeach; ?>
-      </div>
-
       <?php if (isset($_GET['out']) && !$error): ?>
         <div class="alert alert-success py-2 small">You have been logged out.</div>
       <?php endif; ?>
@@ -111,18 +89,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       <form method="post" action="login.php" autocomplete="on">
         <input type="hidden" name="csrf" value="<?= e(csrf_token()) ?>">
-        <input type="hidden" name="tab" id="tabInput" value="<?= e($tab) ?>">
 
         <div class="mb-3">
           <label for="email" class="login-label d-block">Email</label>
           <input type="email" id="email" name="email" class="form-control login-input" value="<?= e($email) ?>"
-                 placeholder="email@pcu.edu.ph" required autocomplete="username">
-        </div>
-
-        <div class="mb-3" id="idField" <?= $tab === 'admin' ? 'hidden' : '' ?>>
-          <label for="school_id" class="login-label d-block" id="idLabel"><?= e($groups[$tab]['idLabel'] ?: 'ID') ?></label>
-          <input id="school_id" name="school_id" class="form-control login-input" value="<?= e($sid) ?>"
-                 <?= $tab === 'admin' ? '' : 'required' ?>>
+                 placeholder="name@pcu-d.edu.ph" required autocomplete="username">
         </div>
 
         <div class="mb-4">
@@ -141,34 +112,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </div>
 
 <script>
-(function () {
-  var labels = <?= json_encode(array_map(fn($g) => $g['idLabel'], $groups)) ?>;
-  var tabInput = document.getElementById('tabInput');
-  var idField = document.getElementById('idField');
-  var idInput = document.getElementById('school_id');
-
-  document.querySelectorAll('.role-switch button').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var tab = btn.dataset.tab;
-      tabInput.value = tab;
-      document.querySelectorAll('.role-switch button').forEach(function (b) { b.classList.toggle('active', b === btn); });
-
-      var needsId = tab !== 'admin';
-      idField.hidden = !needsId;
-      idInput.required = needsId;
-      if (needsId) document.getElementById('idLabel').textContent = labels[tab];
-      var banner = document.querySelector('.login-error');
-      if (banner) banner.remove();
-    });
-  });
-
   document.getElementById('togglePw').addEventListener('click', function () {
     var f = document.getElementById('password');
     var show = f.type === 'password';
     f.type = show ? 'text' : 'password';
     this.firstElementChild.className = show ? 'bi bi-eye-slash' : 'bi bi-eye';
   });
-})();
 </script>
 </body>
 </html>

@@ -24,6 +24,9 @@ const DEPARTMENTS = [
     'SHS', 'JHS', 'Elementary', 'Kiddie College',
 ];
 
+/** Departments a maintenance staff account can belong to */
+const DEPARTMENTS_STAFF = ['ICTC', 'GSO'];
+
 /** Escape output */
 function e(?string $s): string
 {
@@ -51,7 +54,7 @@ function db_default(string $name): array
                       'email' => 'user@pcu.edu.ph', 'school_id' => '2026-001', 'department' => 'COI',
                       'password_hash' => password_hash('user123', PASSWORD_DEFAULT)],
             $blank + ['id' => 3, 'role' => 'Staff', 'last_name' => 'maintenance', 'first_name' => 'Staff', 'mi' => 'M',
-                      'email' => 'mstaff@pcu.edu.ph', 'school_id' => 'STF-001', 'department' => 'Maintenance',
+                      'email' => 'mstaff@pcu.edu.ph', 'school_id' => 'STF-001', 'department' => 'GSO',
                       'password_hash' => password_hash('staff123', PASSWORD_DEFAULT)],
         ];
     }
@@ -303,14 +306,8 @@ function get_reports(?string $status = null, ?string $view = null): array
         )));
     }
     // Staff shortcuts: only the tasks assigned to the logged-in account
-    //   'assigned' = accepted tasks, 'awaiting' = tasks still waiting for this person to accept
-    if ($view !== null) {
-        $reports = array_values(array_filter($reports, function ($r) use ($view, $me) {
-            if (!$me || ($r['assigned_to'] ?? null) !== $me['id']) {
-                return false;
-            }
-            return assign_state($r) === ($view === 'awaiting' ? 'pending' : 'accepted');
-        }));
+    if ($view === 'assigned') {
+        $reports = array_values(array_filter($reports, fn($r) => $me && ($r['assigned_to'] ?? null) === $me['id']));
     }
     if ($status !== null) {
         $reports = array_values(array_filter($reports, fn($r) => $r['status'] === $status));
@@ -392,6 +389,49 @@ function add_report(string $type, string $item, string $building, string $floor,
     return $result;
 }
 
+/** Most unresolved jobs a maintenance staff member can hold at the same time */
+const MAX_ACTIVE_JOBS = 2;
+
+/**
+ * Unresolved jobs a staff member holds: reports assigned to them that the admin has not
+ * marked Resolved yet (a job marked "resolved" by staff still counts until the admin confirms it).
+ * $exceptCode leaves one report out, e.g. the report that is being reassigned.
+ */
+function active_jobs(int $uid, ?array $reports = null, ?string $exceptCode = null): int
+{
+    $n = 0;
+    foreach ($reports ?? db_read('reports') as $r) {
+        if (($r['assigned_to'] ?? null) === $uid && ($r['status'] ?? '') !== 'Resolved' && $r['code'] !== $exceptCode) {
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/** Open tasks this staff member has asked to take and the admin has not answered yet */
+function pending_requests(int $uid, ?array $reports = null): int
+{
+    $n = 0;
+    foreach ($reports ?? db_read('reports') as $r) {
+        if (($r['request_from'] ?? null) === $uid && empty($r['assigned_to'])) {
+            $n++;
+        }
+    }
+    return $n;
+}
+
+/** Jobs plus open requests the current staff member already has (cached for the page) */
+function my_job_load(): int
+{
+    static $load = null;
+    if ($load === null) {
+        $me = current_user();
+        $reports = db_read('reports');
+        $load = $me ? active_jobs($me['id'], $reports) + pending_requests($me['id'], $reports) : 0;
+    }
+    return $load;
+}
+
 /** All maintenance staff accounts, sorted by name */
 function staff_accounts(): array
 {
@@ -421,8 +461,9 @@ function report_find(string $code): ?array
  * Update a report's status, and optionally who it is assigned to.
  *   $opts['assignee']         => ?int   (key present = change the assignment; null = unassign)
  *   $opts['only_assigned_to'] => int    (only update if the report is assigned to this user)
- *   $opts['require_state']    => string (only update if the assignment is in this state, e.g. accepted)
- * A new assignment starts as "pending" until the staff member accepts it.
+ *   $opts['require_state']    => string (only update if the assignment is in this state)
+ * An assignment takes effect right away: staff cannot reject a task the admin gives them.
+ * Assigning an "Under Review" report moves it to "In Progress".
  */
 function update_report(string $code, string $status, array $opts = []): bool
 {
@@ -445,7 +486,10 @@ function update_report(string $code, string $status, array $opts = []): bool
             if (array_key_exists('assignee', $opts) && ($r['assigned_to'] ?? null) !== $opts['assignee']) {
                 $r['assigned_to']  = $opts['assignee'];
                 $r['assigned_at']  = $opts['assignee'] === null ? null : date('Y-m-d');
-                $r['assign_state'] = $opts['assignee'] === null ? null : 'pending';
+                $r['assign_state'] = $opts['assignee'] === null ? null : 'accepted';
+                if ($opts['assignee'] !== null && $r['status'] === 'Under Review') {
+                    $r['status'] = 'In Progress';
+                }
                 $r['request_from'] = null;
                 $r['resolve_request'] = null;
             }
@@ -457,25 +501,25 @@ function update_report(string $code, string $status, array $opts = []): bool
     return $done;
 }
 
-/** '' (not assigned), 'pending' (waiting for the staff member to accept) or 'accepted' */
+/** '' (not assigned) or 'accepted' (assigned; there is no pending step, staff cannot reject a task) */
 function assign_state(array $r): string
 {
     if (empty($r['assigned_to'])) {
         return '';
     }
-    return $r['assign_state'] ?? 'accepted';      // older data without a state counts as accepted
+    return 'accepted';                            // older records that were still "pending" count as assigned too
 }
 
 /**
  * Task workflow actions. Returns a success message, or null if the action isn't allowed.
- *   staff : accept, decline (a task assigned to them), take (ask for an open task), cancel_request,
+ *   staff : take (ask for an open task), cancel_request,
  *           request_resolve (say the work is finished; the admin must confirm)
  *   admin : approve_request, reject_request, confirm_resolved, reject_resolved
  */
-function report_workflow(string $code, string $action, int $uid, bool $admin): ?string
+function report_workflow(string $code, string $action, int $uid, bool $admin, ?string &$error = null, array $proof = [], string $remarks = ''): ?string
 {
     $msg = null;
-    db_update('reports', function (array $reports) use ($code, $action, $uid, $admin, &$msg) {
+    db_update('reports', function (array $reports) use ($code, $action, $uid, $admin, $proof, $remarks, &$msg, &$error) {
         foreach ($reports as &$r) {
             if ($r['code'] !== $code) {
                 continue;
@@ -485,23 +529,14 @@ function report_workflow(string $code, string $action, int $uid, bool $admin): ?
             $req      = $r['request_from'] ?? null;
             $open     = ($r['status'] ?? '') !== 'Resolved';
 
-            if ($action === 'accept' && !$admin && $assigned === $uid && $state === 'pending') {
-                $r['assign_state'] = 'accepted';
-                if ($r['status'] === 'Under Review') {
-                    $r['status'] = 'In Progress';
+            if ($action === 'take' && !$admin && $assigned === null && $req === null && $open) {
+                if (active_jobs($uid, $reports) + pending_requests($uid, $reports) >= MAX_ACTIVE_JOBS) {
+                    $error = 'You can only have ' . MAX_ACTIVE_JOBS . ' jobs at a time (counting tasks you asked for). '
+                           . 'Resolve one of your jobs before taking another.';
+                } else {
+                    $r['request_from'] = $uid;
+                    $msg = 'Request sent for ' . $code . '. It becomes yours once the admin approves it.';
                 }
-                $msg = 'You accepted ' . $code . '. It is now In Progress.';
-
-            } elseif ($action === 'decline' && !$admin && $assigned === $uid && $state === 'pending') {
-                $r['declines'][]   = ['id' => $uid, 'date' => date('Y-m-d')];
-                $r['assigned_to']  = null;
-                $r['assigned_at']  = null;
-                $r['assign_state'] = null;
-                $msg = 'You declined ' . $code . '. The admin will assign it again.';
-
-            } elseif ($action === 'take' && !$admin && $assigned === null && $req === null && $open) {
-                $r['request_from'] = $uid;
-                $msg = 'Request sent for ' . $code . '. It becomes yours once the admin approves it.';
 
             } elseif ($action === 'cancel_request' && !$admin && $req === $uid) {
                 $r['request_from'] = null;
@@ -509,15 +544,17 @@ function report_workflow(string $code, string $action, int $uid, bool $admin): ?
 
             } elseif ($action === 'approve_request' && $admin && $req !== null && $assigned === null) {
                 $person = user_find((int)$req);
-                if ($person && $person['active'] && in_array($person['role'], ROLES_STAFF, true)) {
+                if ($person && active_jobs((int)$req, $reports) >= MAX_ACTIVE_JOBS) {
+                    $error = full_name($person) . ' already has ' . MAX_ACTIVE_JOBS . ' unresolved jobs and cannot take another one.';
+                } elseif ($person && $person['active'] && in_array($person['role'], ROLES_STAFF, true)) {
                     $r['assigned_to']  = (int)$req;
                     $r['assigned_at']  = date('Y-m-d');
-                    $r['assign_state'] = 'accepted';       // they volunteered, so no second acceptance needed
+                    $r['assign_state'] = 'accepted';
                     $r['request_from'] = null;
                     if ($r['status'] === 'Under Review') {
                         $r['status'] = 'In Progress';
                     }
-                    $msg = 'Request approved. ' . $code . ' is now assigned to ' . full_name($person) . '.';
+                    $msg = 'Request approved. ' . $code . ' is now assigned to ' . rtrim(full_name($person), '.') . '.';
                 }
 
             } elseif ($action === 'reject_request' && $admin && $req !== null) {
@@ -527,13 +564,21 @@ function report_workflow(string $code, string $action, int $uid, bool $admin): ?
 
             } elseif ($action === 'request_resolve' && !$admin && $assigned === $uid && $state === 'accepted'
                       && $open && empty($r['resolve_request'])) {
-                $r['resolve_request'] = ['by' => $uid, 'date' => date('Y-m-d')];
-                $r['sent_back']       = null;
-                $msg = $code . ' was marked as resolved. Waiting for the admin to confirm.';
+                if ($remarks === '') {
+                    $error = 'Add your remarks about the work done before marking ' . $code . ' as resolved.';
+                } elseif (!$proof) {
+                    $error = 'Add a photo or video of the finished work before marking ' . $code . ' as resolved.';
+                } else {
+                    $r['resolve_request'] = ['by' => $uid, 'date' => date('Y-m-d'), 'files' => $proof, 'remarks' => $remarks];
+                    $r['sent_back']       = null;
+                    $msg = $code . ' was marked as resolved. Waiting for the admin to confirm.';
+                }
 
             } elseif ($action === 'confirm_resolved' && $admin && !empty($r['resolve_request'])) {
                 $r['status']          = 'Resolved';
                 $r['resolved_at']     = date('Y-m-d');
+                $r['proof']           = $r['resolve_request']['files'] ?? [];   // keep the proof of work
+                $r['remarks']         = $r['resolve_request']['remarks'] ?? '';
                 $r['resolve_request'] = null;
                 $msg = $code . ' was confirmed as resolved.';
 
@@ -550,7 +595,7 @@ function report_workflow(string $code, string $action, int $uid, bool $admin): ?
     return $msg;
 }
 
-/** Open tasks assigned to the current user (waiting for acceptance or accepted) */
+/** Open tasks assigned to the current user */
 function count_assigned_to_me(): int
 {
     $me = current_user();
@@ -563,12 +608,6 @@ function count_active_tasks(): int
     $me = current_user();
     return $me ? count(array_filter(get_reports(), fn($r) => ($r['assigned_to'] ?? null) === $me['id']
                                                           && assign_state($r) === 'accepted' && $r['status'] !== 'Resolved')) : 0;
-}
-
-function count_awaiting_acceptance(): int
-{
-    $me = current_user();
-    return $me ? count(array_filter(get_reports(), fn($r) => ($r['assigned_to'] ?? null) === $me['id'] && assign_state($r) === 'pending')) : 0;
 }
 
 function count_resolved_by_me(): int
@@ -590,7 +629,7 @@ function count_reported_by_me(): int
     return $me ? count(array_filter(db_read('reports'), fn($r) => in_array($me['id'], $r['reporters'] ?? [], true))) : 0;
 }
 
-/** Banner for things waiting on the current user: staff requests (admin) or tasks to accept (staff) */
+/** Banner for things waiting on the admin: staff requests and tasks marked as resolved */
 function render_task_alerts(): void
 {
     if (is_admin()) {
@@ -607,14 +646,6 @@ function render_task_alerts(): void
           <div class="alert alert-success d-flex flex-wrap justify-content-between align-items-center gap-2">
             <span><i class="bi bi-check2-circle me-2"></i><strong><?= $m ?></strong> task<?= $m > 1 ? 's' : '' ?> marked as resolved <?= $m > 1 ? 'are' : 'is' ?> waiting for your confirmation.</span>
             <a class="btn btn-sm btn-success" href="maintenance-log.php?q=awaiting+your+confirmation">Review</a>
-          </div>
-        <?php }
-    } elseif (is_staff()) {
-        $n = count_awaiting_acceptance();
-        if ($n > 0) { ?>
-          <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <span><i class="bi bi-bell-fill me-2"></i>You have <strong><?= $n ?></strong> task<?= $n > 1 ? 's' : '' ?> waiting for your acceptance.</span>
-            <a class="btn btn-sm btn-warning" href="maintenance-log.php?view=awaiting">Review</a>
           </div>
         <?php }
     }
@@ -652,9 +683,6 @@ function render_report(array $r, ?string $borderClass = null): void
     if (!empty($r['assigned_to'])) {
         $who  = $mine ? 'you' : ($assignee ? full_name($assignee) : 'unknown');
         $line = 'Assigned to ' . $who;
-        if ($state === 'pending') {
-            $line .= $mine ? ' — awaiting your acceptance' : ' — awaiting acceptance';
-        }
     } elseif ($reqId) {
         $icon = 'bi-hourglass-split';
         if ($admin) {
@@ -667,13 +695,6 @@ function render_report(array $r, ?string $borderClass = null): void
     } elseif ($open && ($admin || $staff)) {
         $icon = 'bi-person-plus';
         $line = 'Unassigned' . ($staff ? ' — available to take' : '');
-    }
-
-    $declinedNote = '';
-    if ($admin && !empty($r['declines'])) {
-        $last = end($r['declines']);
-        $p    = user_find((int)$last['id']);
-        $declinedNote = 'Declined by ' . ($p ? full_name($p) : 'a staff member') . ' on ' . date('M j, Y', strtotime($last['date']));
     }
 
     // Staff said the work is finished and the admin still has to confirm it
@@ -708,9 +729,12 @@ function render_report(array $r, ?string $borderClass = null): void
         'hasRequest'    => (bool)$reqId,
         'requestName'   => $admin ? ($reqUser ? full_name($reqUser) : 'A staff member') : ($reqByMe ? 'You' : ''),
         'requestedByMe' => (bool)$reqByMe,
-        'canTake'       => $staff && $open && empty($r['assigned_to']) && !$reqId,
-        'declinedNote'  => $declinedNote,
+        'canTake'       => $staff && $open && empty($r['assigned_to']) && !$reqId && my_job_load() < MAX_ACTIVE_JOBS,
+        'atLimit'       => $staff && $open && empty($r['assigned_to']) && !$reqId && my_job_load() >= MAX_ACTIVE_JOBS,
+        'maxJobs'       => MAX_ACTIVE_JOBS,
         'resolvePending' => (bool)$rr,
+        'proof'         => $rr['files'] ?? ($r['proof'] ?? []),
+        'remarks'       => $rr['remarks'] ?? ($r['remarks'] ?? ''),
         'resolveBy'     => $admin ? ($rrUser ? full_name($rrUser) : 'A staff member') : ($rrByMe ? 'You' : ''),
         'sentBack'      => $mine && !empty($r['sent_back']),
         'canUpdate'     => $admin,

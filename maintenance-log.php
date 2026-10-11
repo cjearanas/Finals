@@ -4,14 +4,11 @@ require_once __DIR__ . '/includes/data.php';
 
 $activePage = 'log';
 
-// Staff shortcuts: ?view=assigned or ?view=awaiting show only the tasks assigned to the logged-in account
-$view = (is_staff() && in_array($_GET['view'] ?? '', ['assigned', 'awaiting'], true)) ? $_GET['view'] : null;
+// Staff shortcut: ?view=assigned shows only the tasks assigned to the logged-in account
+$view = (is_staff() && ($_GET['view'] ?? '') === 'assigned') ? 'assigned' : null;
 if ($view === 'assigned') {
     $pageTitle  = 'Assigned Task';
     $activePage = 'assigned';
-} elseif ($view === 'awaiting') {
-    $pageTitle  = 'Awaiting Acceptance';
-    $activePage = 'awaiting';
 }
 require __DIR__ . '/includes/header.php';
 

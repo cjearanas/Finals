@@ -15,7 +15,6 @@ if (is_admin()) {
     $nav['acc-staff'] = ['href' => 'admin-accounts.php?type=staff', 'icon' => 'bi-person-gear',     'label' => 'Maintenance Staff'];
 } elseif (is_staff()) {
     $nav['log']       = ['href' => 'maintenance-log.php',                 'icon' => 'bi-clipboard-check', 'label' => 'Maintenance Log'];
-    $nav['awaiting']  = ['href' => 'maintenance-log.php?view=awaiting', 'icon' => 'bi-bell', 'label' => 'Awaiting Acceptance'];
     $nav['assigned']  = ['href' => 'maintenance-log.php?view=assigned', 'icon' => 'bi-tools',         'label' => 'Assigned Task'];
 } else {
     $nav['report']  = ['href' => 'report-issue.php',    'icon' => 'bi-exclamation-circle', 'label' => 'Report an Issue'];

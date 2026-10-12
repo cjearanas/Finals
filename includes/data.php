@@ -389,6 +389,12 @@ function concern_items(): array
  * A comfort room has plumbing but no air conditioning; other rooms have no plumbing;
  * computer laboratories also get the Computer / Network concern.
  */
+/** Offices, faculty rooms, libraries and clinics (as opposed to classrooms and labs) */
+function is_office_room(string $room): bool
+{
+    return (bool)preg_match('/office|registrar|treasury|accounting|internal audit|records room|admission|archives|dean|faculty room|guidance|discipline|clinic|library|HRD|research|\\bOSA\\b|president|union|purchasing|general services|external affairs|CBAA|\\bCAS\\b|\\bLRC\\b|conference|ictc/i', $room);
+}
+
 /**
  * Items that differ from the usual list for a particular room (computer laboratories only have
  * a computer, TV, air conditioner, whiteboard, table, chair and fire hose cabinet).
@@ -401,6 +407,14 @@ function room_item_overrides(string $room): array
             'Computer / Network' => ['Computer'],
             'Electrical'         => ['TV'],
         ];
+    }
+    // offices: no whiteboard and no TV, but they have computers
+    if (is_office_room($room)) {
+        $o = ['Furniture' => ['Table', 'Chair'], 'Electrical' => ['Electric Fan']];
+        if (stripos($room, 'ictc') === false) {              // the ICTC office keeps the full computer / network list
+            $o['Computer / Network'] = ['Computer'];
+        }
+        return $o;
     }
     return [];
 }
@@ -432,7 +446,7 @@ function room_concerns(string $room): array
     // a normal room: air conditioner, electric fan / TV, whiteboard / table / chair, fire hose cabinet
     $types = [];
     // computer labs and technology rooms also get computer and network concerns
-    if (preg_match('/computer laboratory|ictc|multimedia|audio visual|\\bIMC\\b|\\bITD\\b/i', $room)) {
+    if (is_office_room($room) || preg_match('/computer laboratory|ictc|multimedia|audio visual|\\bIMC\\b|\\bITD\\b/i', $room)) {
         $types[] = 'Computer / Network';
     }
     $types[] = 'Air Conditioning';

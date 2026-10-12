@@ -224,35 +224,163 @@ unset($__me);
 /** Building => Floor => Rooms. Edit this to match your campus. */
 function campus_layout(): array
 {
-    $floors = ['1st Floor' => 1, '2nd Floor' => 2, '3rd Floor' => 3];
+    // 'Room 101 (Graduate School Library)': number plus the name shown on the floor plan
+    $r  = fn(string $no, string $name = ''): string => 'Room ' . $no . ($name === '' ? '' : ' (' . $name . ')');
+    // several rooms with the same label: $same(['201', '202'], 'SHS')
+    $same = fn(array $nos, string $name = ''): array => array_map(fn($n) => $r($n, $name), $nos);
+    $cr = ['Female Comfort Room', 'Male Comfort Room'];
+
     $layout = [];
-    foreach (['New Academic Building', 'College Building', 'Junior High School', 'Elementary Building'] as $building) {
-        foreach ($floors as $floor => $n) {
-            $rooms = [];
-            for ($i = 1; $i <= 5; $i++) {
-                $rooms[] = 'Room ' . $n . '0' . $i;
-            }
-            if ($building === 'New Academic Building' && $floor === '3rd Floor') {
-                array_push($rooms, 'Computer Laboratory 7', 'Computer Laboratory 8', 'Computer Laboratory 9');
-            }
-            $rooms[] = 'Comfort Room';
-            $layout[$building][$floor] = $rooms;
-        }
-    }
-    return $layout;
+
+    // ---------------- New Academic Building ----------------
+    $layout['New Academic Building'] = [
+        'Basement' => [
+            $r('001', 'Crim Forensic Lab'), $r('002', 'Investigation Crim Lab'), $r('003', 'Darkroom Crimlab'),
+            $r('004', 'Criminology'), $r('005', 'Criminology'), $r('006', 'SHS'), $r('007', 'SHS'), $r('008', 'NSTP'),
+            $r('009', 'Stockroom Accounting'), $r('010', 'Civil Engineering Laboratory'),
+            $r('011', 'Industrial Engineering Tech. Lab'), $r('012', 'SHS'), $r('013', 'Moot Court'),
+            $r('014', 'Crime Scene Lab'), $r('015', 'Dactyloscopy / Ballistics'), $r('016', 'Social Works'),
+            'RCVJ Storage', 'Electrical Room',
+        ],
+        'Ground Floor' => array_merge([
+            $r('101', 'Records Room, Basic Education'), $r('102', 'Records Room, Grad School'),
+            $r('103', 'Registrar, College / Grad School'), $r('104', 'Registrar, Basic Ed'), $r('105', 'Treasury'),
+            $r('106', 'Accounting'), $r('107', 'Internal Audit'), $r('108', 'Electrical Lab'),
+            $r('109', 'Criminology Department Office'), $r('110', 'Development Office'),
+            $r('111', 'VPAG / Dean of Colleges'), $r('112', 'Admission / Registrar Office'), $r('113', 'Archives'),
+            $r('114', 'SHS Library'), 'Storage Room', 'Electrical Room',
+        ], $cr),
+        '2nd Floor' => array_merge([
+            $r('201', 'College of Engineering'), $r('202', 'College of Engineering'), $r('203', 'College of Engineering'),
+            $r('204', 'GSBM / OEPA / GSE'), $r('205', 'HRD Office'), $r('206', 'Research & Publications'),
+            $r('207', 'Chem Lab'), $r('208', 'Physics Lab'), $r('209', 'College of Law Library'),
+            $r('210', 'College of Law'), $r('211', 'College of Engineering'), $r('212', 'College of Engineering'),
+            $r('213', 'College of Engineering'), 'GSBM Storage', 'Electrical Room',
+        ], $cr),
+        '3rd Floor' => array_merge([
+            $r('301', 'SHS'), $r('302', 'ICTC - Technical & Cybersec'), $r('303', 'Computer Laboratory 8'),
+            $r('304', 'Multimedia'), $r('305', 'Computer Laboratory 9'), $r('306', 'Computer Laboratory 10'),
+            $r('307', 'Computer Laboratory 11'), $r('308', 'SHS'), $r('309', 'SHS'), $r('310', 'SHS'), $r('311', 'SHS'),
+            $r('312', 'College'), $r('313', 'College'), 'GSBM Storage', 'Electrical Room',
+        ], $cr),
+        '4th Floor' => array_merge([
+            $r('401', "Dean's Office, CNHS"), $r('402', 'Faculty Room, CNHS'), $r('403', 'Conference Room, CNHS'),
+            $r('404', 'Nursing Skills Laboratory'), $r('405', 'Skills Lab, CNHS'), $r('406', 'Skills Lab, CNHS'),
+            $r('407', 'CNHS'), $r('408', 'CNHS'), $r('409', 'CNHS'), $r('410', 'CNHS'), $r('411', 'CNHS'),
+            $r('412', 'Skills Lab, CNHS'), $r('413', 'CNHS'), 'OEPA Storage', 'Electrical Room',
+        ], $cr),
+        '5th Floor' => array_merge(
+            $same(['501', '502', '503'], 'SHS'), [$r('504', 'Audio Visual Room')],
+            $same(['505', '506', '507', '508', '509', '510', '511', '512', '513'], 'SHS'),
+            ['Storage Room', 'Electrical Room'], $cr),
+        '6th Floor' => array_merge(
+            $same(['601', '602', '603'], 'SHS'), [$r('604', "President's Office")],
+            $same(['605', '606', '607', '608', '609', '610', '611', '612', '613'], 'SHS'),
+            ['Storage Room', 'Electrical Room'], $cr),
+        '7th Floor' => [
+            'Function Hall', 'Mezzanine', 'Mezzanine Control Room (Left)', 'Mezzanine Control Room (Right)',
+            'Mezzanine Dressing Room (Left)', 'Mezzanine Dressing Room (Right)',
+        ],
+    ];
+
+    // ---------------- College Building (plus the college grounds) ----------------
+    $layout['College Building'] = [
+        'Ground Floor' => array_merge(['Male Comfort Room'], [
+            $r('101', 'Graduate School Library'), $r('102'), $r('103', 'College Library'), $r('104'),
+            $r('105', 'College Room 105'), $r('106', 'College of Education'), $r('107', 'Guidance Office Testing Room'),
+            $r('108', 'Guidance Office College'), $r('109', 'CBAA'), $r('110', 'OSA'), $r('111', 'College Clinic'),
+            'Female Comfort Room', 'Storage Room',
+        ]),
+        '2nd Floor' => [
+            'Male Comfort Room', $r('210'), $r('209', 'BA Simulation'), $r('208', 'Psych Lab'), $r('207', 'IMC'),
+            $r('206', 'Audio Visual Room'), $r('205-B', 'ITD College'), $r('205-A', 'NSTP'),
+            $r('204', 'College of Informatics'), $r('203', 'CAS'), $r('202', 'Science Lab'),
+            $r('201', 'Chemistry Lab'), 'Female Comfort Room', 'Storage Room',
+        ],
+        '3rd Floor' => [
+            $r('311', 'Female Faculty Room'), $r('310'), $r('309'), $r('308'), $r('307'), $r('306'), $r('305'),
+            $r('304'), $r('303'), $r('302'), $r('301'), $r('300', 'Male Faculty Room'), 'Storage Room',
+        ],
+        'College Grounds' => ['Mock Hotel', 'CHTM', 'Chaplaincy'],
+    ];
+
+    // ---------------- Junior High School (Retrofitted Building) ----------------
+    $layout['Junior High School'] = [
+        'Ground Floor' => [
+            'Male Comfort Room', $r('108', 'Computer Laboratory 7'), $r('107', 'Computer Laboratory 6'),
+            $r('106', 'Computer Laboratory 5'), $r('105', 'Computer Laboratory 4'), $r('104', 'Computer Laboratory 3'),
+            $r('103', 'External Affairs Office'), $r('102', "JHS Principal's Office"), $r('101', 'Faculty Room'),
+            'Female Comfort Room',
+        ],
+        '2nd Floor' => [
+            'Male Comfort Room', $r('210'), $r('209'), $r('208'), $r('207'), $r('206'), $r('205'), $r('204'),
+            $r('203', "Discipline's Office"), $r('202', 'Guidance Office'), $r('201', 'JHS Library'),
+            'Female Comfort Room',
+        ],
+        '3rd Floor' => [
+            $r('311', 'Faculty Room 2'), $r('310'), $r('309'), $r('308'), $r('307'), $r('306'), $r('305'),
+            $r('304'), $r('303'), $r('302'), $r('301', 'Faculty Room 1'),
+        ],
+    ];
+
+    // ---------------- Senior High School (Old High School Building) ----------------
+    $layout['Senior High School'] = [
+        'Ground Floor' => [
+            $r('001', "SHS Principal's Office"), $r('002', 'SHS Faculty Room'), $r('003', 'University Clinic'),
+            $r('004', 'Chemistry Laboratory'), $r('005', 'SHS Library'), $r('006', 'Purchasing & Property'),
+            $r('007', 'Union Office'), $r('008', 'General Services Office'), $r('009', 'Tailoring'),
+            'Administrative Office', 'Gymnasium / Athletics Department',
+            $r('101', 'Biology Lab'), $r('102', 'OSA'), $r('103', 'Faculty Room, HUMMS'), $r('104', 'Guidance SHS'),
+            $r('105', 'Guidance SHS'), $r('106', 'Faculty Room, ABM'), $r('107', 'Faculty Room, ICT'),
+            $r('108', 'Disciplines Office'), $r('109', 'Faculty Room, STEM'), $r('110', 'H.E. Lab'), $r('111', 'H.E. Lab'),
+            'Female Comfort Room', 'Male Comfort Room',
+        ],
+        '2nd Floor' => [
+            $r('201', 'Speech Lab'), $r('202'), $r('203'), $r('204'), $r('205'), $r('206'), $r('207', 'Faculty Room, H.E.'),
+        ],
+        '3rd Floor' => [
+            $r('301'), $r('302', 'Faculty Room, H.E.'), $r('303'), $r('304'), $r('305'), $r('306'),
+            $r('307', 'Practice House'), $r('308', 'T.L.E. Lab'), $r('309'), $r('310'), $r('311'), $r('312'),
+            $r('313'), $r('314'), $r('315'), $r('316', 'Engineering Lab'),
+        ],
+    ];
+
+    // ---------------- Elementary Building ----------------
+    $layout['Elementary Building'] = [
+        'Ground Floor' => array_merge([
+            $r('101', 'Guidance'), $r('102'), $r('103'), $r('104', 'Clinic'), $r('105-A', 'Stock Room'),
+            $r('105-B', 'Faculty Room'), $r('106-A', "Principal's Office"), $r('106-B', 'Library'),
+            $r('107-A', 'Computer Laboratory 2'), $r('107-B', 'Computer Laboratory 1'), $r('108', 'Science Room'),
+            $r('109', 'HELE Room'), $r('110', 'Nursery'), $r('111', 'Kindergarten'), $r('112', 'Music Room'),
+            $r('113', 'Kinder'), $r('114', 'Kinder'), 'School Canteen', 'Multi-Purpose Hall',
+        ], $cr),
+        '2nd Floor' => array_merge([
+            $r('201', 'Stockroom, SHS'), $r('202', 'SHS'), $r('203'), $r('204'), $r('205', 'SHS'), $r('206', 'SHS'),
+            $r('207', 'SHS'), $r('208', 'LRC'), $r('209'), $r('210'), $r('211'), $r('212'), $r('213'), $r('214'),
+            $r('215'), $r('216'), $r('217'),
+        ], $cr),
+    ];
+
+    // building order shown on the Report an Issue page
+    $order = ['New Academic Building', 'College Building', 'Junior High School', 'Senior High School', 'Elementary Building'];
+    return array_merge(array_flip($order), $layout);
 }
 
 /** Concern type => Items. Edit freely. */
 function concern_items(): array
 {
+    // A normal room only has: air conditioner, electric fan, TV, whiteboard, table, chair and a fire hose cabinet.
     return [
-        'Air Conditioning' => ['Air Conditioner Unit', 'Remote Control', 'Thermostat', 'Vent / Duct', 'Other'],
-        'Leaking Pipe'     => ['Faucet', 'Toilet', 'Sink', 'Water Pipe', 'Drainage', 'Other'],
-        'Broken Window'    => ['Window Glass', 'Window Frame', 'Window Lock', 'Curtain / Blinds', 'Other'],
-        'Electrical'       => ['Light Fixture', 'Power Outlet', 'Switch', 'Electric Fan', 'Projector', 'Circuit Breaker', 'Other'],
-        'Furniture'        => ['Chair', 'Desk', 'Whiteboard', 'Cabinet', 'Door', 'Other'],
+        'Air Conditioning'   => ['Air Conditioner Unit'],
+        'Electrical'         => ['Electric Fan', 'TV'],
+        'Furniture'          => ['Whiteboard', 'Table', 'Chair'],
+        'Fire Safety'        => ['Fire Hose Cabinet'],
+        'Cleaning'           => ['Spilled Liquid', 'Trash / Garbage', 'Dirty Floor / Wall', 'Other'],   // any room
+        // only offered for the rooms that need them (see room_concerns)
         'Computer / Network' => ['Desktop Computer', 'Monitor', 'Keyboard', 'Mouse', 'Internet / Network', 'Printer', 'Other'],
-        'Other'            => ['Other'],
+        'Leaking Pipe'       => ['Faucet', 'Toilet', 'Sink', 'Water Pipe', 'Drainage', 'Other'],
+        'Broken Window'      => ['Window Glass', 'Window Frame', 'Window Lock', 'Curtain / Blinds', 'Other'],
+        'Other'              => ['Other'],
     ];
 }
 
@@ -261,6 +389,28 @@ function concern_items(): array
  * A comfort room has plumbing but no air conditioning; other rooms have no plumbing;
  * computer laboratories also get the Computer / Network concern.
  */
+/**
+ * Items that differ from the usual list for a particular room (computer laboratories only have
+ * a computer, TV, air conditioner, whiteboard, table, chair and fire hose cabinet).
+ * Returns [concern type => items], or [] when the room uses the usual lists.
+ */
+function room_item_overrides(string $room): array
+{
+    if (stripos($room, 'Computer Laboratory') !== false) {
+        return [
+            'Computer / Network' => ['Computer'],
+            'Electrical'         => ['TV'],
+        ];
+    }
+    return [];
+}
+
+/** The items to choose from for a concern type in a given room */
+function room_items(string $room, string $type): array
+{
+    return room_item_overrides($room)[$type] ?? (concern_items()[$type] ?? []);
+}
+
 /** Which maintenance department handles a concern: technology goes to ICTC, everything else to GSO */
 function concern_department(string $type): string
 {
@@ -275,13 +425,22 @@ function staff_can_handle(?array $user, array $report): bool
 
 function room_concerns(string $room): array
 {
+    // comfort rooms: pipes, windows, anything else
     if (stripos($room, 'Comfort Room') !== false) {
-        return ['Leaking Pipe', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
+        return ['Leaking Pipe', 'Cleaning', 'Broken Window', 'Other'];
     }
-    if (stripos($room, 'Computer Laboratory') !== false) {
-        return ['Computer / Network', 'Air Conditioning', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
+    // a normal room: air conditioner, electric fan / TV, whiteboard / table / chair, fire hose cabinet
+    $types = [];
+    // computer labs and technology rooms also get computer and network concerns
+    if (preg_match('/computer laboratory|ictc|multimedia|audio visual|\\bIMC\\b|\\bITD\\b/i', $room)) {
+        $types[] = 'Computer / Network';
     }
-    return ['Air Conditioning', 'Electrical', 'Broken Window', 'Furniture', 'Other'];
+    $types[] = 'Air Conditioning';
+    // rooms with sinks and water lines
+    if (preg_match('/chem|science|physics|biology|h\\.e\\. lab|skills lab|nursing skills|canteen|clinic|mock hotel|chtm|practice house|crime scene|tailoring/i', $room)) {
+        $types[] = 'Leaking Pipe';
+    }
+    return array_merge($types, ['Electrical', 'Furniture', 'Fire Safety', 'Cleaning']);
 }
 
 // ---------------------------------------------------------------------------

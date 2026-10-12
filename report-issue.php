@@ -9,10 +9,14 @@ if (is_admin() || is_staff()) {   // admins and maintenance staff handle reports
 $campus = campus_layout();
 $items  = concern_items();
 $roomTypes = [];
+$itemOverrides = [];
 foreach ($campus as $floors) {
     foreach ($floors as $rooms) {
         foreach ($rooms as $rm) {
             $roomTypes[$rm] = room_concerns($rm);
+            if (room_item_overrides($rm)) {
+                $itemOverrides[$rm] = room_item_overrides($rm);
+            }
         }
     }
 }
@@ -40,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if (!isset($items[$old['type']]) || !in_array($old['type'], room_concerns($old['room']), true)) {
             $errors[] = 'Please select a concern type that fits the room.';
-        } elseif (!in_array($old['item'], $items[$old['type']], true)) {
+        } elseif (!in_array($old['item'], room_items($old['room'], $old['type']), true)) {
             $errors[] = 'Please select an item.';
         }
         if (mb_strlen($old['description']) > 1000) {
@@ -75,11 +79,13 @@ $activePage = 'report';
 $buildingImages = [];
 foreach (array_keys($campus) as $b) {
     $slug = trim(preg_replace('/[^a-z0-9]+/', '-', strtolower($b)), '-');
-    $img  = 'images/' . $slug . '.svg';
-    foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
-        if (is_file(__DIR__ . '/images/' . $slug . '.' . $ext)) {
-            $img = 'images/' . $slug . '.' . $ext;
-            break;
+    $img  = 'assets/buildings/' . $slug . '.svg';                       // drawn placeholder
+    foreach (['images', 'assets/buildings'] as $dir) {                   // a real photo wins
+        foreach (['jpg', 'jpeg', 'png', 'webp'] as $ext) {
+            if (is_file(__DIR__ . '/' . $dir . '/' . $slug . '.' . $ext)) {
+                $img = $dir . '/' . $slug . '.' . $ext;
+                break 2;
+            }
         }
     }
     $buildingImages[$b] = $img;
@@ -286,6 +292,8 @@ require __DIR__ . '/includes/header.php';
   const campus = <?= json_encode($campus, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
   const items  = <?= json_encode($items,  JSON_HEX_TAG | JSON_HEX_AMP) ?>;
   const roomTypes = <?= json_encode($roomTypes, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  const itemOverrides = <?= json_encode($itemOverrides, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  const itemsFor = (r, t) => (itemOverrides[r] && itemOverrides[r][t]) || items[t] || [];
   const old    = <?= json_encode($old,    JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 
   const $ = id => document.getElementById(id);
@@ -333,7 +341,7 @@ require __DIR__ . '/includes/header.php';
       if (!type.options.length || type.dataset.room !== room.value) {
         type.dataset.room = room.value;
         fill(type, (roomTypes[room.value] || []), 'Select a concern type', old.room === room.value ? old.type : '');
-        fill(item, items[type.value] || [], 'Select an item', old.room === room.value ? old.item : '');
+        fill(item, itemsFor(room.value, type.value), 'Select an item', old.room === room.value ? old.item : '');
       }
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -393,7 +401,7 @@ require __DIR__ . '/includes/header.php';
   }
 
   // Step 3: concern type depends on the room, item on the concern type
-  type.addEventListener('change', () => fill(item, items[type.value] || [], 'Select an item'));
+  type.addEventListener('change', () => fill(item, itemsFor(room.value, type.value), 'Select an item'));
 
   // ---------- File upload (images / videos only, 50MB) ----------
   const MAX = 50 * 1024 * 1024;

@@ -21,6 +21,17 @@
   .rm-header h5 { font-weight: 500; font-size: 1.5rem; }
   .rm-close { background: none; border: 0; color: #fff; font-size: 1.9rem; line-height: 1; padding: 0 .25rem; }
   .rm-body { padding: 1rem 1.5rem 1.5rem; }
+  .rm-media img { cursor: zoom-in; }
+  .rm-proof-item { position: relative; border: 1px solid #ced4da; border-radius: 8px; overflow: hidden; background: #f1f3f5;
+                   width: 110px; height: 90px; padding: 0; cursor: zoom-in; display: flex; align-items: center; justify-content: center; }
+  .rm-proof-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .rm-proof-item:hover { border-color: #012a5e; }
+  .rm-proof-item .bi { font-size: 1.8rem; color: #012a5e; }
+  .rm-proof-item .tag { position: absolute; right: 4px; bottom: 4px; background: rgba(0,0,0,.55); color: #fff; border-radius: 4px; font-size: .65rem; padding: 0 .3rem; }
+  #fxLightbox { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,.88); display: none; align-items: center; justify-content: center; padding: 1.5rem; cursor: zoom-out; }
+  #fxLightbox.open { display: flex; }
+  #fxLightbox img, #fxLightbox video { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 8px 40px rgba(0,0,0,.6); cursor: default; }
+  #fxLightbox .lb-close { position: absolute; top: .75rem; right: 1.1rem; background: none; border: 0; color: #fff; font-size: 2.4rem; line-height: 1; }
   .rm-media { width: 100%; max-width: 360px; height: 200px; margin: 0 auto .75rem; background: #d9d9d9;
               display: flex; align-items: center; justify-content: center; overflow: hidden; color: #6b6b6b; text-align: center; }
   .rm-media img, .rm-media video { width: 100%; height: 100%; object-fit: contain; background: #000; }
@@ -122,6 +133,12 @@
   </div>
 </div>
 
+<!-- Click-to-enlarge viewer for report photos and videos -->
+<div id="fxLightbox" role="dialog" aria-label="Enlarged photo or video">
+  <button type="button" class="lb-close" aria-label="Close">&times;</button>
+  <div id="fxLightboxBody"></div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.14.5/dist/sweetalert2.all.min.js"></script>
 
@@ -213,6 +230,24 @@ document.addEventListener('submit', function (e) {
   var $ = function (id) { return document.getElementById(id); };
   var DIR = 'uploads/';
 
+  // ----- Enlarge a photo / video -----
+  var lb = document.getElementById('fxLightbox'), lbBody = document.getElementById('fxLightboxBody');
+  function openLightbox(file) {
+    lbBody.innerHTML = '';
+    var el = document.createElement(file.kind === 'video' ? 'video' : 'img');
+    if (file.kind === 'video') { el.controls = true; el.autoplay = true; } else { el.alt = file.name; }
+    el.src = DIR + encodeURIComponent(file.file);
+    el.addEventListener('click', function (e) { e.stopPropagation(); });
+    lbBody.appendChild(el);
+    lb.classList.add('open');
+  }
+  function closeLightbox() { lb.classList.remove('open'); lbBody.innerHTML = ''; }
+  lb.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && lb.classList.contains('open')) { e.stopPropagation(); closeLightbox(); }
+  }, true);
+  modal.addEventListener('hidden.bs.modal', closeLightbox);
+
   function showMedia(file) {
     var box = $('rm-media');
     box.innerHTML = '';
@@ -229,6 +264,8 @@ document.addEventListener('submit', function (e) {
     } else {
       el = document.createElement('img');
       el.alt = file.name;
+      el.title = 'Click to enlarge';
+      el.addEventListener('click', function () { openLightbox(file); });
     }
     el.src = DIR + encodeURIComponent(file.file);
     box.appendChild(el);
@@ -327,10 +364,17 @@ document.addEventListener('submit', function (e) {
     (d.proof || []).forEach(function (f) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'btn btn-sm btn-outline-secondary';
-      b.innerHTML = '<i class="bi bi-' + (f.kind === 'video' ? 'camera-video' : 'image') + '"></i> ';
-      b.appendChild(document.createTextNode(f.name));
-      b.addEventListener('click', function () { showMedia(f); $('rm-media').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); });
+      b.className = 'rm-proof-item';
+      b.title = f.name + ' (click to enlarge)';
+      if (f.kind === 'video') {
+        b.innerHTML = '<i class="bi bi-play-circle-fill"></i><span class="tag">video</span>';
+      } else {
+        var im = document.createElement('img');
+        im.src = DIR + encodeURIComponent(f.file);
+        im.alt = f.name;
+        b.appendChild(im);
+      }
+      b.addEventListener('click', function () { openLightbox(f); });   // opens bigger; the main photo above stays as it is
       pl.appendChild(b);
     });
     pv.hidden = !(d.proof && d.proof.length);

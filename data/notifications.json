@@ -16,5 +16,32 @@
         "icon": "person-check",
         "created": "2026-10-11 16:52:07",
         "read": true
+    },
+    {
+        "id": 3,
+        "user_id": 1,
+        "text": "Maintenance, Staff L submitted the finished work for RPT-001. Please review and confirm.",
+        "code": "RPT-001",
+        "icon": "clipboard-check",
+        "created": "2026-10-15 07:40:01",
+        "read": true
+    },
+    {
+        "id": 4,
+        "user_id": 2,
+        "text": "Good news! Your report RPT-001 (Computer \/ Network at Computer Laboratory 7, 3rd Floor, New Academic Building) has been resolved.",
+        "code": "RPT-001",
+        "icon": "check2-circle",
+        "created": "2026-10-15 07:40:27",
+        "read": false
+    },
+    {
+        "id": 5,
+        "user_id": 3,
+        "text": "The admin confirmed RPT-001 as resolved. Thank you!",
+        "code": "RPT-001",
+        "icon": "check2-circle",
+        "created": "2026-10-15 07:40:27",
+        "read": false
     }
 ]

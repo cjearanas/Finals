@@ -15,7 +15,7 @@
                 "kind": "image"
             }
         ],
-        "status": "In Progress",
+        "status": "Resolved",
         "date": "2026-10-11",
         "filed": "2026-10-11",
         "count": 1,
@@ -26,6 +26,16 @@
         "assigned_at": "2026-10-11",
         "assign_state": "accepted",
         "request_from": null,
-        "resolve_request": null
+        "resolve_request": null,
+        "sent_back": null,
+        "resolved_at": "2026-10-15",
+        "proof": [
+            {
+                "name": "COLLEGE GROUND FLOOR.png",
+                "file": "3b2568dcd8c6d8960e9e8b10.png",
+                "kind": "image"
+            }
+        ],
+        "remarks": "awesfw"
     }
 ]

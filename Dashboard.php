@@ -95,13 +95,7 @@ $boxBase = 'dashboard-box h-100 position-relative d-flex flex-column align-items
       </a>
     </div>
 
-    <div class="col-md-4">
-      <a href="maintenance-log.php?view=assigned#tab-resolved" class="<?= $boxBase ?> text-bg-success">
-        <span class="position-absolute top-0 end-0 m-2 small"><?= count_resolved_by_me() ?></span>
-        <i class="bi bi-check-circle fs-1"></i>
-        Resolved
-      </a>
-    </div>
+    
 
   </div>
 
